@@ -351,11 +351,11 @@
                 <span class="css-1ox0ukt">
                     <span aria-label="" role="img" aria-hidden="true" class="css-34iy07">
                         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/>
+                            <path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zM10 6a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z" fill="currentColor"/>
                         </svg>
                     </span>
                 </span>
-                <p class="css-1fz4hyd" mdn-text="">Dashboard</p>
+                <p class="css-1fz4hyd" mdn-text="">PalletLand</p>
             </div>
         `;
 
@@ -544,7 +544,7 @@
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
                         <div>
-                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📊 RIV Dashboard</h1>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📦 PalletLand</h1>
                             <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Drop Zone Monitoring System</p>
                         </div>
                         <button id="close-dashboard" style="
@@ -579,7 +579,7 @@
                                 font-weight: 500;
                                 transition: all 0.3s ease;
                                 box-shadow: 0 2px 4px rgba(23,162,184,0.3);
-                            ">🔄 Refresh Data</button>
+                            ">🔄 Deep Scan</button>
                             
                             <button id="export-dashboard" disabled style="
                                 background: #6c757d;
@@ -632,7 +632,7 @@
                             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                         ">
                             <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">📊</div>
-                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading Dashboard Data...</h3>
+                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading PalletLand Data...</h3>
                             <p style="color: #6c757d; margin-bottom: 30px;">Fetching Drop Zone information automatically</p>
                         </div>
                     </div>
@@ -1263,7 +1263,7 @@
         
         const csvContent = convertToCSV(csvData);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `dashboard_overview_${timestamp}.csv`;
+        const filename = `palletland_overview_${timestamp}.csv`;
         
         downloadCSV(csvContent, filename);
         
