@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Fast deep container analysis - optimized for speed
 // @author       kubicdar
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
@@ -324,8 +324,12 @@
 
         // Dashboard menu item
         const dashboardItem = document.createElement('a');
-        dashboardItem.href = '/dashboard';
+        dashboardItem.href = '#';
         dashboardItem.setAttribute('data-riv-menu-item', 'dashboard');
+        dashboardItem.onclick = function(e) {
+            e.preventDefault();
+            showDashboard();
+        };
         dashboardItem.innerHTML = `
             <div class="footer-item">
                 <span class="css-1ox0ukt">
@@ -476,6 +480,318 @@
         overlay.onclick = (e) => {
             if (e.target === overlay) overlay.remove();
         };
+    }
+
+    // Dashboard functionality
+    function showDashboard() {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+
+        // Create modal content
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 95vw;
+            width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        `;
+
+        modal.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+                <h2 style="margin: 0; color: #333;">📊 RIV Dashboard - Drop Zone Overview</h2>
+                <button id="close-dashboard" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <button id="start-scan" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">🔍 Start Full Scan</button>
+                    <button id="refresh-dashboard" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
+                    <button id="export-dashboard" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" disabled>📊 Export CSV</button>
+                </div>
+                
+                <div id="scan-progress" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span id="progress-text">Scanning Drop Zones...</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div style="background: #dee2e6; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div id="progress-bar" style="background: #28a745; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboard-content">
+                <div style="text-align: center; padding: 50px; color: #666;">
+                    Click "Start Full Scan" to analyze Drop Zones DZ-CDPL-A01 through DZ-CDPL-A50
+                </div>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        // Event listeners
+        document.getElementById('close-dashboard').onclick = () => overlay.remove();
+        document.getElementById('start-scan').onclick = () => startDropZoneScan();
+        document.getElementById('refresh-dashboard').onclick = () => startDropZoneScan();
+        document.getElementById('export-dashboard').onclick = () => exportDashboardData();
+
+        // Close on overlay click
+        overlay.onclick = (e) => {
+            if (e.target === overlay) overlay.remove();
+        };
+    }
+
+    // Dashboard data storage
+    let dashboardData = [];
+    
+    async function startDropZoneScan() {
+        dashboardData = [];
+        const progressDiv = document.getElementById('scan-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const startBtn = document.getElementById('start-scan');
+        const refreshBtn = document.getElementById('refresh-dashboard');
+        const exportBtn = document.getElementById('export-dashboard');
+        
+        // Show progress and disable buttons
+        progressDiv.style.display = 'block';
+        startBtn.disabled = true;
+        refreshBtn.disabled = true;
+        exportBtn.disabled = true;
+        
+        // Generate drop zone list (DZ-CDPL-A01 to DZ-CDPL-A50)
+        const dropZones = [];
+        for (let i = 1; i <= 50; i++) {
+            const dzNumber = i.toString().padStart(2, '0');
+            dropZones.push(`DZ-CDPL-A${dzNumber}`);
+        }
+        
+        const totalZones = dropZones.length;
+        let completedZones = 0;
+        
+        // Get current page parameters
+        const currentUrl = window.location.href;
+        const warehouseId = 'CDPL1'; // Assuming CDPL warehouse
+        const associate = 'System'; // Default associate for dashboard scans
+        
+        // Process zones in batches
+        const batchSize = 3; // Smaller batch size to avoid overwhelming server
+        const batches = [];
+        
+        for (let i = 0; i < dropZones.length; i += batchSize) {
+            batches.push(dropZones.slice(i, i + batchSize));
+        }
+        
+        for (const batch of batches) {
+            const batchPromises = batch.map(async (dropZoneId) => {
+                try {
+                    progressText.textContent = `Scanning ${dropZoneId}...`;
+                    
+                    const details = await getContainerDetails(dropZoneId, warehouseId, associate);
+                    
+                    let totalPallets = 0;
+                    let totalUnits = 0;
+                    let sortationCategory = 'N/A';
+                    let status = 'Active';
+                    
+                    if (details && details.childContainers && details.childContainers.length > 0) {
+                        totalPallets = details.childContainers.length;
+                        totalUnits = details.childContainers.reduce((sum, child) => 
+                            sum + (child.numOfChildContainers || 0), 0);
+                        
+                        // Get sortation category from first pallet
+                        if (details.childContainers[0]) {
+                            sortationCategory = details.childContainers[0].sortationCategory || 'N/A';
+                        }
+                    } else {
+                        status = 'Empty';
+                    }
+                    
+                    return {
+                        dropZoneId,
+                        totalPallets,
+                        totalUnits,
+                        sortationCategory,
+                        status,
+                        lastUpdated: new Date().toLocaleString('pl-PL')
+                    };
+                    
+                } catch (error) {
+                    console.warn(`Error scanning ${dropZoneId}:`, error.message);
+                    return {
+                        dropZoneId,
+                        totalPallets: 0,
+                        totalUnits: 0,
+                        sortationCategory: 'Error',
+                        status: 'Empty',
+                        lastUpdated: new Date().toLocaleString('pl-PL')
+                    };
+                }
+            });
+            
+            // Wait for batch to complete
+            const batchResults = await Promise.all(batchPromises);
+            dashboardData.push(...batchResults);
+            
+            completedZones += batch.length;
+            const percentage = Math.round((completedZones / totalZones) * 100);
+            
+            progressBar.style.width = `${percentage}%`;
+            progressPercentage.textContent = `${percentage}%`;
+            progressText.textContent = `Completed ${completedZones}/${totalZones} zones`;
+            
+            // Update dashboard display with current data
+            updateDashboardDisplay();
+        }
+        
+        // Hide progress and enable buttons
+        progressDiv.style.display = 'none';
+        startBtn.disabled = false;
+        refreshBtn.disabled = false;
+        exportBtn.disabled = false;
+        
+        console.log('Dashboard scan complete:', dashboardData);
+    }
+    
+    function updateDashboardDisplay() {
+        const contentDiv = document.getElementById('dashboard-content');
+        if (!contentDiv || dashboardData.length === 0) return;
+        
+        // Calculate summary stats
+        const totalZones = dashboardData.length;
+        const activeZones = dashboardData.filter(dz => dz.status === 'Active').length;
+        const emptyZones = dashboardData.filter(dz => dz.status === 'Empty').length;
+        const totalPalletsAll = dashboardData.reduce((sum, dz) => sum + dz.totalPallets, 0);
+        const totalUnitsAll = dashboardData.reduce((sum, dz) => sum + dz.totalUnits, 0);
+        
+        // Group by sortation category
+        const categoryStats = {};
+        dashboardData.forEach(dz => {
+            if (dz.status === 'Active') {
+                const cat = dz.sortationCategory;
+                if (!categoryStats[cat]) {
+                    categoryStats[cat] = { zones: 0, pallets: 0, units: 0 };
+                }
+                categoryStats[cat].zones++;
+                categoryStats[cat].pallets += dz.totalPallets;
+                categoryStats[cat].units += dz.totalUnits;
+            }
+        });
+        
+        contentDiv.innerHTML = `
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
+                <div style="background: #28a745; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${activeZones}</h3>
+                    <p style="margin: 0; font-size: 14px;">Active Zones</p>
+                </div>
+                <div style="background: #6c757d; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${emptyZones}</h3>
+                    <p style="margin: 0; font-size: 14px;">Empty Zones</p>
+                </div>
+                <div style="background: #17a2b8; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${totalPalletsAll}</h3>
+                    <p style="margin: 0; font-size: 14px;">Total Pallets</p>
+                </div>
+                <div style="background: #fd7e14; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${totalUnitsAll}</h3>
+                    <p style="margin: 0; font-size: 14px;">Total Units</p>
+                </div>
+            </div>
+            
+            <!-- Sortation Categories -->
+            <div style="margin-bottom: 30px;">
+                <h3 style="color: #333; margin-bottom: 15px;">📋 Sortation Categories</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    ${Object.entries(categoryStats).map(([category, stats]) => `
+                        <div style="background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 6px;">
+                            <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">${category}</h4>
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #6c757d;">
+                                <span>${stats.zones} zones</span>
+                                <span>${stats.pallets} pallets</span>
+                                <span>${stats.units} units</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Detailed Table -->
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <thead style="background: #343a40; color: white;">
+                        <tr>
+                            <th style="padding: 12px; text-align: left; font-size: 14px;">Drop Zone</th>
+                            <th style="padding: 12px; text-align: center; font-size: 14px;">Status</th>
+                            <th style="padding: 12px; text-align: center; font-size: 14px;">Pallets</th>
+                            <th style="padding: 12px; text-align: center; font-size: 14px;">Units</th>
+                            <th style="padding: 12px; text-align: left; font-size: 14px;">Sortation Category</th>
+                            <th style="padding: 12px; text-align: center; font-size: 14px;">Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${dashboardData.map((dz, index) => `
+                            <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
+                                <td style="padding: 10px; font-weight: bold; color: #495057;">${dz.dropZoneId}</td>
+                                <td style="padding: 10px; text-align: center;">
+                                    <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; 
+                                          background: ${dz.status === 'Active' ? '#d4edda; color: #155724' : '#f8d7da; color: #721c24'};">
+                                        ${dz.status}
+                                    </span>
+                                </td>
+                                <td style="padding: 10px; text-align: center; font-weight: bold; color: #495057;">${dz.totalPallets}</td>
+                                <td style="padding: 10px; text-align: center; font-weight: bold; color: #495057;">${dz.totalUnits}</td>
+                                <td style="padding: 10px; color: #6c757d; font-size: 12px;">${dz.sortationCategory}</td>
+                                <td style="padding: 10px; text-align: center; color: #6c757d; font-size: 11px;">${dz.lastUpdated}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    function exportDashboardData() {
+        if (dashboardData.length === 0) {
+            alert('No data to export. Please run a scan first.');
+            return;
+        }
+        
+        // Prepare CSV data
+        const csvData = dashboardData.map(dz => ({
+            'Drop Zone ID': dz.dropZoneId,
+            'Status': dz.status,
+            'Total Pallets': dz.totalPallets,
+            'Total Units': dz.totalUnits,
+            'Sortation Category': dz.sortationCategory,
+            'Last Updated': dz.lastUpdated
+        }));
+        
+        const csvContent = convertToCSV(csvData);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `dashboard_overview_${timestamp}.csv`;
+        
+        downloadCSV(csvContent, filename);
+        
+        console.log('Dashboard data exported:', csvData.length, 'records');
     }
 
     // Settings storage
