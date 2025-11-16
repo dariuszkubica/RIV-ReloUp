@@ -440,7 +440,7 @@
 
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.0</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.1</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Author:</strong> kubicdar</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality</p>
                 <p style="margin: 5px 0; color: #666;">
@@ -846,44 +846,27 @@
                     updateInfo.innerHTML = `
                         <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; border-radius: 4px; margin-top: 10px;">
                             <span style="color: #856404; font-size: 12px;">📢 Update available: v${remoteVersion}</span>
-                            <button onclick="checkForUpdates(); this.parentNode.parentNode.remove();" 
+                            <button id="settings-update-now" data-version="${remoteVersion}" 
                                     style="margin-left: 10px; background: #ffc107; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">Update Now</button>
                         </div>
                     `;
-                } else {
-                    updateInfo.innerHTML = '<span style="color: #28a745; font-size: 12px;">✅ Up to date</span>';
-                }
-            } else {
-                updateInfo.innerHTML = '<span style="color: #dc3545; font-size: 12px;">❌ Cannot check version</span>';
-            }
-        } catch (error) {
-            updateInfo.innerHTML = '<span style="color: #6c757d; font-size: 12px;">⚠️ Update check failed</span>';
-        }
-    }
-    
-    async function checkUpdateStatus() {
-        const updateInfo = document.getElementById('update-info');
-        if (!updateInfo) return;
-        
-        updateInfo.innerHTML = '<span style="color: #666; font-size: 12px;">Checking for updates...</span>';
-        
-        try {
-            const response = await fetch(GITHUB_RAW_URL);
-            if (!response.ok) throw new Error('Failed to fetch');
-            
-            const scriptContent = await response.text();
-            const versionMatch = scriptContent.match(/@version\s+([\d\.]+)/);
-            
-            if (versionMatch) {
-                const remoteVersion = versionMatch[1];
-                if (compareVersions(remoteVersion, CURRENT_VERSION) > 0) {
-                    updateInfo.innerHTML = `
-                        <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; border-radius: 4px; margin-top: 10px;">
-                            <span style="color: #856404; font-size: 12px;">📢 Update available: v${remoteVersion}</span>
-                            <button onclick="checkForUpdates(); this.parentNode.parentNode.remove();" 
-                                    style="margin-left: 10px; background: #ffc107; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">Update Now</button>
-                        </div>
-                    `;
+                    
+                    // Add event listener for the update button
+                    setTimeout(() => {
+                        const updateBtn = document.getElementById('settings-update-now');
+                        if (updateBtn) {
+                            updateBtn.onclick = async () => {
+                                try {
+                                    const response = await fetch(GITHUB_RAW_URL);
+                                    const scriptContent = await response.text();
+                                    const version = updateBtn.getAttribute('data-version');
+                                    performUpdate(scriptContent, version);
+                                } catch (error) {
+                                    alert('Failed to fetch update: ' + error.message);
+                                }
+                            };
+                        }
+                    }, 100);
                 } else {
                     updateInfo.innerHTML = '<span style="color: #28a745; font-size: 12px;">✅ Up to date</span>';
                 }
@@ -918,7 +901,7 @@
     }
 
     // Auto-update functionality
-    const CURRENT_VERSION = '1.0';
+    const CURRENT_VERSION = '1.1';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     async function checkForUpdates() {
