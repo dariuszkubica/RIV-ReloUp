@@ -16,6 +16,14 @@
     
     let isProcessing = false;
     
+    // Global session data storage
+    let sessionData = {
+        warehouseId: null,
+        associate: null,
+        sessionId: null,
+        lastCaptured: null
+    };
+    
     // Add Total Items column to existing DROP_ZONE table
     function addTotalItemsColumn() {
         const table = document.querySelector('table.searched-container-table');
@@ -93,6 +101,14 @@
         
         if (data.childContainers && Array.isArray(data.childContainers)) {
             data.childContainers.forEach(container => {
+                // Get sortation category - it's an array, take first element
+                let sortationCategory = '';
+                if (container.sortationCategories && Array.isArray(container.sortationCategories) && container.sortationCategories.length > 0) {
+                    sortationCategory = container.sortationCategories[0];
+                } else if (container.sortationCategory) {
+                    sortationCategory = container.sortationCategory;
+                }
+                
                 const containerInfo = {
                     'Container ID': container.containerId || '',
                     'Parent Container': parentInfo ? parentInfo.containerId : 'Root',
@@ -101,7 +117,7 @@
                     'TOTE': parentInfo ? container.containerId : (container.numOfChildContainers || 0),
                     'Tote ID': parentInfo ? container.containerId : '',
                     'ITEM': parentInfo ? (container.numOfChildContainers || 0) : '',
-                    'Sortation Category': container.sortationCategory || '',
+                    'Sortation Category': sortationCategory,
                     'CDD': container.cdd || '',
                     'LPD': container.lpd || '',
                     'Latest Container Operation': container.latestOperation || container.latestContainerOperation || '',
@@ -483,7 +499,6 @@
     }
 
     // Dashboard functionality
-    let originalPageContent = null;
     let isDashboardActive = false;
 
     function showDashboard() {
@@ -491,18 +506,35 @@
         
         isDashboardActive = true;
         
-        // Store original page content
-        originalPageContent = document.body.innerHTML;
+        // Create modal overlay instead of replacing page content
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 999999;
+            overflow-y: auto;
+            padding: 20px;
+        `;
         
-        // Replace entire page content with dashboard
-        document.body.innerHTML = `
-            <div id="dashboard-app" style="
-                min-height: 100vh;
-                background: #f8f9fa;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                margin: 0;
-                padding: 0;
-            ">
+        // Create dashboard content container
+        const dashboardContainer = document.createElement('div');
+        dashboardContainer.id = 'dashboard-app';
+        dashboardContainer.style.cssText = `
+            min-height: calc(100vh - 40px);
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        `;
+        
+        dashboardContainer.innerHTML = `
                 <!-- Dashboard Header -->
                 <header style="
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -605,8 +637,10 @@
                         </div>
                     </div>
                 </main>
-            </div>
         `;
+        
+        overlay.appendChild(dashboardContainer);
+        document.body.appendChild(overlay);
 
         // Add CSS for hover effects
         const style = document.createElement('style');
@@ -618,34 +652,61 @@
         document.head.appendChild(style);
 
         // Event listeners
-        document.getElementById('close-dashboard').onclick = () => closeDashboard();
+        document.getElementById('close-dashboard').onclick = () => closeDashboard(overlay);
         document.getElementById('refresh-dashboard').onclick = () => startDropZoneScan();
         document.getElementById('export-dashboard').onclick = () => exportDashboardData();
+        
+        // Close on overlay click
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closeDashboard(overlay);
+        };
+        
+        // Show session debug info
+        setTimeout(() => {
+            const debugInfo = document.createElement('div');
+            debugInfo.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                padding: 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1000000;
+                max-width: 300px;
+            `;
+            debugInfo.innerHTML = `
+                <strong>🔧 Session Debug Info:</strong><br>
+                warehouseId: ${sessionData.warehouseId || 'Not captured'}<br>
+                associate: ${sessionData.associate || 'Not captured'}<br>
+                lastCaptured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}
+            `;
+            overlay.appendChild(debugInfo);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (debugInfo.parentNode) {
+                    debugInfo.remove();
+                }
+            }, 10000);
+        }, 1000);
         
         // Auto-start scan when dashboard opens
         setTimeout(() => {
             startDropZoneScan();
-        }, 500);
+        }, 2000); // Longer delay to allow session capture
     }
 
-    function closeDashboard() {
+    function closeDashboard(overlay) {
         if (!isDashboardActive) return;
         
         isDashboardActive = false;
         
-        // Restore original page content
-        if (originalPageContent) {
-            document.body.innerHTML = originalPageContent;
-            
-            // Re-initialize the script functionality
-            setTimeout(() => {
-                addTotalItemsColumn();
-                initializeCopyToClipboard();
-                addMenuOptions();
-            }, 100);
+        // Remove modal overlay
+        if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
         }
-        
-        originalPageContent = null;
     }
 
     // Dashboard data storage
@@ -665,22 +726,52 @@
         refreshBtn.disabled = true;
         exportBtn.disabled = true;
         
-        // Generate drop zone list (DZ-CDPL-A01 to DZ-CDPL-A50)
-        const dropZones = [];
-        for (let i = 1; i <= 50; i++) {
-            const dzNumber = i.toString().padStart(2, '0');
-            dropZones.push(`DZ-CDPL-A${dzNumber}`);
+        // Wait for valid session data or try to get it
+        if (!sessionData.warehouseId || !sessionData.associate || 
+            sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
+            
+            progressText.textContent = 'Waiting for valid session data...';
+            progressBar.style.width = '0%';
+            progressPercentage.textContent = 'Initializing';
+            
+            // Try to trigger a real API call to capture session data
+            try {
+                await tryToGetSessionData();
+            } catch (e) {
+                console.warn('Could not get session data:', e.message);
+            }
+            
+            // If still no valid session data, warn user
+            if (!sessionData.warehouseId || sessionData.warehouseId === 'CDPL1') {
+                progressText.textContent = 'Warning: Using default session data. This may cause errors.';
+                progressPercentage.textContent = 'Warning';
+                
+                // Wait a moment for user to see the warning
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
         }
+        
+        // Show deep scanning warning
+        progressText.textContent = 'Starting deep scan - this will take longer but provides accurate unit counts...';
+        progressPercentage.textContent = 'Starting';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Generate drop zone list (DZ-CDPL-A01 to DZ-CDPL-D50)
+        const dropZones = [];
+        const categories = ['A', 'B', 'C', 'D'];
+        
+        categories.forEach(category => {
+            for (let i = 1; i <= 50; i++) {
+                const dzNumber = i.toString().padStart(2, '0');
+                dropZones.push(`DZ-CDPL-${category}${dzNumber}`);
+            }
+        });
         
         const totalZones = dropZones.length;
         let completedZones = 0;
         
-        // Get current page parameters - use proper search method
-        const warehouseId = 'CDPL1'; // Assuming CDPL warehouse
-        const associate = 'System'; // Default associate for dashboard scans
-        
-        // Process zones in batches
-        const batchSize = 2; // Smaller batch size to avoid overwhelming server
+        // Process zones in batches (smaller batch size for deep scanning)
+        const batchSize = 1; // Single zone at a time due to deep scanning
         const batches = [];
         
         for (let i = 0; i < dropZones.length; i += batchSize) {
@@ -693,7 +784,7 @@
                     progressText.textContent = `Scanning ${dropZoneId}...`;
                     
                     // First do a search to get proper data structure
-                    const searchDetails = await performContainerSearch(dropZoneId, warehouseId, associate);
+                    const searchDetails = await performContainerSearch(dropZoneId);
                     
                     let totalPallets = 0;
                     let totalUnits = 0;
@@ -704,17 +795,46 @@
                         status = 'Active';
                         totalPallets = searchDetails.childContainers.length;
                         
-                        // Calculate total units from all pallets
-                        for (const pallet of searchDetails.childContainers) {
-                            if (pallet.numOfChildContainers) {
-                                totalUnits += pallet.numOfChildContainers;
+                        // Get sortation category from first pallet
+                        if (searchDetails.childContainers[0]) {
+                            const firstPallet = searchDetails.childContainers[0];
+                            // sortationCategories is an array, take first element
+                            if (firstPallet.sortationCategories && Array.isArray(firstPallet.sortationCategories) && firstPallet.sortationCategories.length > 0) {
+                                sortationCategory = firstPallet.sortationCategories[0];
+                            } else if (firstPallet.sortationCategory) {
+                                sortationCategory = firstPallet.sortationCategory;
                             }
                         }
                         
-                        // Get sortation category from first pallet
-                        if (searchDetails.childContainers[0]) {
-                            sortationCategory = searchDetails.childContainers[0].sortationCategory || 'N/A';
+                        // Deep scan: Get actual units from each pallet
+                        progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
+                        
+                        for (const pallet of searchDetails.childContainers) {
+                            try {
+                                // Get detailed contents of this pallet
+                                const palletDetails = await performContainerSearch(pallet.containerId);
+                                
+                                if (palletDetails && palletDetails.childContainers && Array.isArray(palletDetails.childContainers)) {
+                                    // Count units in this pallet
+                                    const palletUnits = palletDetails.childContainers.reduce((sum, tote) => {
+                                        return sum + (tote.numOfChildContainers || 0);
+                                    }, 0);
+                                    
+                                    totalUnits += palletUnits;
+                                    
+                                    console.log(`📦 ${dropZoneId} > ${pallet.containerId}: ${palletDetails.childContainers.length} totes, ${palletUnits} units`);
+                                } else {
+                                    // Fallback: use numOfChildContainers from parent data
+                                    totalUnits += (pallet.numOfChildContainers || 0);
+                                }
+                            } catch (palletError) {
+                                console.warn(`⚠️ Error scanning pallet ${pallet.containerId}:`, palletError.message);
+                                // Fallback: use numOfChildContainers from parent data
+                                totalUnits += (pallet.numOfChildContainers || 0);
+                            }
                         }
+                        
+                        console.log(`🏁 ${dropZoneId} summary: ${totalPallets} pallets, ${totalUnits} total units`);
                     }
                     
                     return {
@@ -727,15 +847,28 @@
                     };
                     
                 } catch (error) {
-                    console.warn(`Error scanning ${dropZoneId}:`, error.message);
-                    return {
-                        dropZoneId,
-                        totalPallets: 0,
-                        totalUnits: 0,
-                        sortationCategory: 'Error',
-                        status: 'Empty',
-                        lastUpdated: new Date().toLocaleString('pl-PL')
-                    };
+                    // HTTP 400 usually means the drop zone is empty or doesn't exist
+                    if (error.message.includes('HTTP 400')) {
+                        console.log(`🚧 ${dropZoneId}: Empty or non-existent (HTTP 400) - marking as Empty`);
+                        return {
+                            dropZoneId,
+                            totalPallets: 0,
+                            totalUnits: 0,
+                            sortationCategory: 'Empty',
+                            status: 'Empty',
+                            lastUpdated: new Date().toLocaleString('pl-PL')
+                        };
+                    } else {
+                        console.warn(`❌ Error scanning ${dropZoneId}:`, error.message);
+                        return {
+                            dropZoneId,
+                            totalPallets: 0,
+                            totalUnits: 0,
+                            sortationCategory: 'Error',
+                            status: 'Error',
+                            lastUpdated: new Date().toLocaleString('pl-PL')
+                        };
+                    }
                 }
             });
             
@@ -748,7 +881,7 @@
             
             progressBar.style.width = `${percentage}%`;
             progressPercentage.textContent = `${percentage}%`;
-            progressText.textContent = `Completed ${completedZones}/${totalZones} zones`;
+            progressText.textContent = `Deep scanned ${completedZones}/${totalZones} zones`;
             
             // Update dashboard display with current data
             updateDashboardDisplay();
@@ -769,8 +902,116 @@
         console.log('Dashboard scan complete:', dashboardData);
     }
     
+    // Try to get valid session data by examining page content and network requests
+    async function tryToGetSessionData() {
+        return new Promise((resolve, reject) => {
+            // Method 1: Look for session data in page content
+            try {
+                // Check for data in localStorage
+                const storageKeys = Object.keys(localStorage);
+                for (const key of storageKeys) {
+                    try {
+                        const value = localStorage.getItem(key);
+                        if (value && (value.includes('CDPL') || value.includes('warehouse'))) {
+                            const data = JSON.parse(value);
+                            if (data.warehouseId && data.warehouseId !== 'CDPL1') {
+                                sessionData.warehouseId = data.warehouseId;
+                            }
+                            if (data.associate && data.associate !== 'System') {
+                                sessionData.associate = data.associate;
+                            }
+                        }
+                    } catch (e) {}
+                }
+                
+                // Check for data in window object
+                if (window.__APP_STATE__ || window.__INITIAL_STATE__) {
+                    const state = window.__APP_STATE__ || window.__INITIAL_STATE__;
+                    if (state.user || state.session) {
+                        const userData = state.user || state.session;
+                        if (userData.warehouseId) sessionData.warehouseId = userData.warehouseId;
+                        if (userData.associate) sessionData.associate = userData.associate;
+                        if (userData.username) sessionData.associate = userData.username;
+                    }
+                }
+                
+                // Try to extract from meta tags
+                const metaTags = document.querySelectorAll('meta[name*="warehouse"], meta[name*="user"]');
+                metaTags.forEach(tag => {
+                    const content = tag.getAttribute('content');
+                    if (content && content !== 'CDPL1' && content !== 'System') {
+                        if (tag.name.includes('warehouse')) {
+                            sessionData.warehouseId = content;
+                        } else if (tag.name.includes('user')) {
+                            sessionData.associate = content;
+                        }
+                    }
+                });
+                
+                console.log('🔧 Session data extraction attempt:', {
+                    warehouseId: sessionData.warehouseId,
+                    associate: sessionData.associate,
+                    isValid: sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1'
+                });
+                
+                resolve(sessionData);
+                
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    
     // Perform container search like the main application does
-    async function performContainerSearch(containerId, warehouseId, associate) {
+    async function performContainerSearch(containerId) {
+        // Use captured session data or try to extract from page
+        let warehouseId = sessionData.warehouseId || 'CDPL1';
+        let associate = sessionData.associate || 'System';
+        
+        // If we don't have session data, try multiple extraction methods
+        if (!sessionData.warehouseId || !sessionData.associate) {
+            try {
+                // Method 1: Extract from DOM elements and scripts
+                const scripts = document.querySelectorAll('script[type="application/json"], script:not([src])');
+                for (const script of scripts) {
+                    const text = script.textContent || script.innerText;
+                    if (text && (text.includes('warehouseId') || text.includes('associate'))) {
+                        // Look for JSON-like structures
+                        const warehouseMatch = text.match(/["']?warehouseId["']?\s*[:=]\s*["']([A-Z0-9]{3,10})["']/i);
+                        const associateMatch = text.match(/["']?(?:associate|username|user)["']?\s*[:=]\s*["']([A-Z0-9]{3,20})["']/i);
+                        
+                        if (warehouseMatch && warehouseMatch[1] !== 'CDPL1') {
+                            warehouseId = warehouseMatch[1];
+                            sessionData.warehouseId = warehouseId;
+                        }
+                        if (associateMatch && associateMatch[1] !== 'System') {
+                            associate = associateMatch[1];
+                            sessionData.associate = associate;
+                        }
+                    }
+                }
+                
+                // Method 2: Check URL parameters or path
+                const url = window.location.href;
+                const warehouseUrlMatch = url.match(/warehouse[=/]([A-Z0-9]{3,10})/i);
+                const userUrlMatch = url.match(/user[=/]([A-Z0-9]{3,20})/i);
+                
+                if (warehouseUrlMatch) {
+                    warehouseId = warehouseUrlMatch[1];
+                    sessionData.warehouseId = warehouseId;
+                }
+                if (userUrlMatch) {
+                    associate = userUrlMatch[1];
+                    sessionData.associate = associate;
+                }
+                
+            } catch (e) {
+                console.warn('🔧 Could not extract session data, using defaults:', e.message);
+            }
+        }
+        
+        console.log(`🔍 Performing search for ${containerId} with warehouseId: ${warehouseId}, associate: ${associate}`);
+        
         const requestData = {
             containerId: containerId,
             warehouseId: warehouseId,
@@ -787,22 +1028,70 @@
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
             
+            // Copy headers from real requests if available
+            try {
+                const cookies = document.cookie;
+                if (cookies) {
+                    xhr.setRequestHeader('Cookie', cookies);
+                }
+                
+                // Try to copy other important headers from a recent request
+                const lastRequest = sessionStorage.getItem('lastRequestHeaders');
+                if (lastRequest) {
+                    const headers = JSON.parse(lastRequest);
+                    Object.keys(headers).forEach(key => {
+                        if (!['content-type', 'accept', 'cookie'].includes(key.toLowerCase())) {
+                            xhr.setRequestHeader(key, headers[key]);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not set additional headers');
+            }
+            
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
+                    console.log(`📡 API Response for ${containerId}: Status ${xhr.status}`);
+                    
                     if (xhr.status === 200) {
                         try {
                             const data = JSON.parse(xhr.responseText);
+                            
+                            // Debug sortation categories
+                            if (data.childContainers && data.childContainers.length > 0) {
+                                const firstContainer = data.childContainers[0];
+                                if (firstContainer.sortationCategories) {
+                                    console.log(`📋 ${containerId} sortationCategories:`, firstContainer.sortationCategories);
+                                }
+                            }
+                            
+                            console.log(`✅ Success for ${containerId}:`, data.childContainers ? `${data.childContainers.length} containers` : 'No containers');
                             resolve(data);
                         } catch (e) {
+                            console.error(`❌ Parse error for ${containerId}:`, e.message);
                             reject(new Error(`Parse error: ${e.message}`));
                         }
                     } else {
-                        reject(new Error(`HTTP ${xhr.status}`));
+                        console.error(`❌ HTTP error for ${containerId}: ${xhr.status} ${xhr.statusText}`);
+                        console.error('Request data:', requestData);
+                        console.error('Response text:', xhr.responseText);
+                        
+                        // For 400 errors, suggest session data issues
+                        if (xhr.status === 400) {
+                            console.error(`🚫 Likely cause: Invalid session parameters. Try refreshing the page and using the main search function first to capture valid session data.`);
+                        }
+                        
+                        reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
                     }
                 }
             };
             
-            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.onerror = () => {
+                console.error(`❌ Network error for ${containerId}`);
+                reject(new Error('Network error'));
+            };
+            
+            console.log(`🚀 Sending request for ${containerId}:`, requestData);
             xhr.send(JSON.stringify(requestData));
         });
     }
@@ -815,20 +1104,39 @@
         const totalZones = dashboardData.length;
         const activeZones = dashboardData.filter(dz => dz.status === 'Active').length;
         const emptyZones = dashboardData.filter(dz => dz.status === 'Empty').length;
+        const errorZones = dashboardData.filter(dz => dz.status === 'Error').length;
         const totalPalletsAll = dashboardData.reduce((sum, dz) => sum + dz.totalPallets, 0);
         const totalUnitsAll = dashboardData.reduce((sum, dz) => sum + dz.totalUnits, 0);
         
-        // Group by sortation category
+        // Group by category (A, B, C, D) and sortation category
         const categoryStats = {};
+        const sortationStats = {};
+        
         dashboardData.forEach(dz => {
+            const category = dz.dropZoneId.match(/DZ-CDPL-([ABCD])/)?.[1] || 'Unknown';
+            if (!categoryStats[category]) {
+                categoryStats[category] = { total: 0, active: 0, empty: 0, error: 0, pallets: 0, units: 0 };
+            }
+            categoryStats[category].total++;
             if (dz.status === 'Active') {
-                const cat = dz.sortationCategory;
-                if (!categoryStats[cat]) {
-                    categoryStats[cat] = { zones: 0, pallets: 0, units: 0 };
+                categoryStats[category].active++;
+                categoryStats[category].pallets += dz.totalPallets;
+                categoryStats[category].units += dz.totalUnits;
+                
+                // Count sortation categories
+                const sortCat = dz.sortationCategory;
+                if (sortCat && sortCat !== 'N/A' && sortCat !== 'Empty') {
+                    if (!sortationStats[sortCat]) {
+                        sortationStats[sortCat] = { zones: 0, pallets: 0, units: 0 };
+                    }
+                    sortationStats[sortCat].zones++;
+                    sortationStats[sortCat].pallets += dz.totalPallets;
+                    sortationStats[sortCat].units += dz.totalUnits;
                 }
-                categoryStats[cat].zones++;
-                categoryStats[cat].pallets += dz.totalPallets;
-                categoryStats[cat].units += dz.totalUnits;
+            } else if (dz.status === 'Empty') {
+                categoryStats[category].empty++;
+            } else if (dz.status === 'Error') {
+                categoryStats[category].error++;
             }
         });
         
@@ -836,7 +1144,7 @@
             <!-- Summary Statistics -->
             <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <h3 style="margin: 0 0 20px 0; color: #333;">📊 Summary Statistics</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 25px;">
                     <div style="text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #28a745;">${activeZones}</div>
                         <div style="font-size: 14px; color: #666;">Active Zones</div>
@@ -845,6 +1153,12 @@
                         <div style="font-size: 24px; font-weight: bold; color: #6c757d;">${emptyZones}</div>
                         <div style="font-size: 14px; color: #666;">Empty Zones</div>
                     </div>
+                    ${errorZones > 0 ? `
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #dc3545;">${errorZones}</div>
+                        <div style="font-size: 14px; color: #666;">Error Zones</div>
+                    </div>
+                    ` : ''}
                     <div style="text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #17a2b8;">${totalPalletsAll}</div>
                         <div style="font-size: 14px; color: #666;">Total Pallets</div>
@@ -854,7 +1168,37 @@
                         <div style="font-size: 14px; color: #666;">Total Units</div>
                     </div>
                 </div>
+                
+                <!-- Category Breakdown -->
+                <h4 style="margin: 20px 0 15px 0; color: #555;">📂 By Category:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    ${Object.keys(categoryStats).sort().map(category => `
+                        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${category === 'A' ? '#28a745' : category === 'B' ? '#17a2b8' : category === 'C' ? '#ffc107' : '#dc3545'};">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px;">Category ${category}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Active: <strong>${categoryStats[category].active}</strong> / ${categoryStats[category].total}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${categoryStats[category].pallets}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${categoryStats[category].units}</strong></div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
+            
+            <!-- Sortation Categories -->
+            ${Object.keys(sortationStats).length > 0 ? `
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">🏷️ Sortation Categories</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    ${Object.keys(sortationStats).sort().map(category => `
+                        <div style="padding: 15px; background: #f1f3f4; border-radius: 8px; border-left: 4px solid #007bff;">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px; font-size: 14px;">${category}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${sortationStats[category].zones}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
             
             <!-- Drop Zone Table -->
             <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -872,16 +1216,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${dashboardData.map((dz, index) => `
+                            ${dashboardData.map((dz, index) => {
+                                const statusColor = dz.status === 'Active' ? '#28a745' : 
+                                                   dz.status === 'Empty' ? '#6c757d' : '#dc3545';
+                                const categoryColor = dz.dropZoneId.includes('-A') ? '#28a745' :
+                                                     dz.dropZoneId.includes('-B') ? '#17a2b8' :
+                                                     dz.dropZoneId.includes('-C') ? '#ffc107' : '#dc3545';
+                                
+                                return `
                                 <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
-                                    <td style="padding: 10px 8px; font-weight: 500; color: #495057;">${dz.dropZoneId}</td>
-                                    <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.status}</td>
+                                    <td style="padding: 10px 8px; font-weight: 500; color: ${categoryColor};">${dz.dropZoneId}</td>
+                                    <td style="padding: 10px 8px; text-align: center;">
+                                        <span style="color: ${statusColor}; font-weight: 500;">${dz.status}</span>
+                                    </td>
                                     <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalPallets}</td>
                                     <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalUnits}</td>
-                                    <td style="padding: 10px 8px; color: #6c757d;">${dz.sortationCategory}</td>
+                                    <td style="padding: 10px 8px; color: #6c757d; font-size: 12px;" title="${dz.sortationCategory}">
+                                        ${dz.sortationCategory && dz.sortationCategory.length > 20 ? dz.sortationCategory.substring(0, 20) + '...' : dz.sortationCategory || 'N/A'}
+                                    </td>
                                     <td style="padding: 10px 8px; text-align: center; color: #6c757d; font-size: 12px;">${dz.lastUpdated}</td>
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -1293,12 +1649,16 @@
         }
     }
     
-    // Fast API request without excessive logging
+    // Fast API request with session management
     async function getContainerDetails(containerId, warehouseId, associate) {
+        // Use global session data if available
+        const actualWarehouseId = sessionData.warehouseId || warehouseId;
+        const actualAssociate = sessionData.associate || associate;
+        
         const requestData = {
             containerId: containerId,
-            warehouseId: warehouseId,
-            associate: associate,
+            warehouseId: actualWarehouseId,
+            associate: actualAssociate,
             includeChildren: true,
             mode: "SEARCH",
             locale: "pl-PL",
@@ -1311,6 +1671,14 @@
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
             
+            // Copy important headers
+            try {
+                const cookies = document.cookie;
+                if (cookies) {
+                    xhr.setRequestHeader('Cookie', cookies);
+                }
+            } catch (e) {}
+            
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
@@ -1321,6 +1689,14 @@
                             reject(new Error(`Parse error: ${e.message}`));
                         }
                     } else {
+                        // Log detailed error for debugging
+                        if (xhr.status === 400) {
+                            console.warn(`⚠️ HTTP 400 for ${containerId} - Invalid request parameters:`, {
+                                warehouseId: actualWarehouseId,
+                                associate: actualAssociate,
+                                response: xhr.responseText
+                            });
+                        }
                         reject(new Error(`HTTP ${xhr.status}`));
                     }
                 }
@@ -1452,13 +1828,39 @@
         return false;
     }
     
-    // Minimal XHR interceptor
+    // Enhanced XHR interceptor for session management
     const originalXHRSend = XMLHttpRequest.prototype.send;
     
     XMLHttpRequest.prototype.send = function(data) {
         const xhr = this;
         
         if (this._url && this._url.includes('getContainer') && data) {
+            try {
+                // Capture session data from real API requests
+                const requestData = JSON.parse(data);
+                if (requestData.warehouseId && requestData.associate) {
+                    // Only update if we get non-default values
+                    if (requestData.warehouseId !== 'CDPL1' && requestData.associate !== 'System') {
+                        sessionData.warehouseId = requestData.warehouseId;
+                        sessionData.associate = requestData.associate;
+                        sessionData.lastCaptured = new Date();
+                        console.log(`🔐 Valid session data captured: warehouseId=${sessionData.warehouseId}, associate=${sessionData.associate}`);
+                    } else {
+                        console.warn(`🚫 Skipped default session data: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
+                    }
+                }
+                
+                // Store request headers for future use
+                try {
+                    const headers = {};
+                    // Note: We can't directly access request headers from XHR, but we can try to infer them
+                    sessionStorage.setItem('lastRequestHeaders', JSON.stringify(headers));
+                } catch (e) {}
+                
+            } catch (e) {
+                console.warn('Could not parse request data for session capture:', e.message);
+            }
+            
             const originalOnReadyStateChange = this.onreadystatechange;
             
             this.onreadystatechange = function() {
