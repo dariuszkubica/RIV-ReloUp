@@ -187,6 +187,112 @@
         }
     };
 
+    // Copy to clipboard functionality with Ctrl + LMB
+    function initializeCopyToClipboard() {
+        // Add click event listener to document for table elements
+        document.addEventListener('click', function(event) {
+            // Check if Ctrl key is pressed
+            if (!event.ctrlKey) return;
+            
+            // Check if clicked element is within a table cell
+            const cell = event.target.closest('td, th');
+            if (!cell) return;
+            
+            // Check if it's within our target tables
+            const table = cell.closest('table.searched-container-table');
+            if (!table) return;
+            
+            // Prevent default action and event bubbling
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Get text content to copy
+            let textToCopy = '';
+            
+            // Check if it's a button with container ID
+            const button = cell.querySelector('button.css-47ekp');
+            if (button) {
+                textToCopy = button.textContent.trim();
+            } else {
+                // Get text from span or direct cell content
+                const span = cell.querySelector('span');
+                textToCopy = span ? span.textContent.trim() : cell.textContent.trim();
+            }
+            
+            // Copy to clipboard
+            if (textToCopy) {
+                navigator.clipboard.writeText(textToCopy).then(function() {
+                    // Show visual feedback
+                    showCopyFeedback(cell, textToCopy);
+                }).catch(function(err) {
+                    // Fallback for older browsers
+                    fallbackCopyToClipboard(textToCopy);
+                    showCopyFeedback(cell, textToCopy);
+                });
+            }
+        });
+    }
+    
+    // Fallback copy function for older browsers
+    function fallbackCopyToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            console.warn('Fallback copy failed:', err);
+        }
+        
+        document.body.removeChild(textArea);
+    }
+    
+    // Show visual feedback when text is copied
+    function showCopyFeedback(cell, copiedText) {
+        // Create temporary tooltip
+        const tooltip = document.createElement('div');
+        tooltip.textContent = `Copied: ${copiedText}`;
+        tooltip.style.cssText = `
+            position: absolute;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        `;
+        
+        // Position tooltip near the clicked cell
+        const rect = cell.getBoundingClientRect();
+        tooltip.style.left = (rect.left + window.scrollX) + 'px';
+        tooltip.style.top = (rect.top + window.scrollY - 30) + 'px';
+        
+        // Add green border to cell temporarily
+        const originalBorder = cell.style.border;
+        const originalBackground = cell.style.backgroundColor;
+        cell.style.border = '2px solid #28a745';
+        cell.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+        
+        document.body.appendChild(tooltip);
+        
+        // Remove feedback after 1.5 seconds
+        setTimeout(() => {
+            if (tooltip.parentNode) {
+                tooltip.parentNode.removeChild(tooltip);
+            }
+            cell.style.border = originalBorder;
+            cell.style.backgroundColor = originalBackground;
+        }, 1500);
+    }
+
     // Update Total Items display
     function updateTotalItemsDisplay(totalItems = null, message = '', isError = false) {
         const totalItemsElement = document.getElementById('riv-total-items');
@@ -422,7 +528,8 @@
     // Initialize
     const init = () => {
         addTotalItemsColumn();
-        console.log('📄 Fast container analysis ready - Integrated column view enabled');
+        initializeCopyToClipboard();
+        console.log('📄 Fast container analysis ready - Integrated column view and copy functionality enabled');
     };
     
     if (document.readyState === 'loading') {
