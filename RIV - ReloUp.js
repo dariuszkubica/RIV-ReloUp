@@ -1,12 +1,18 @@
 // ==UserScript==
 // @name         RIV - ReloUp
-// @namespace    http://tampermonkey.net/
+// @namespace    KTW1
 // @version      1.3
-// @description  Fast deep container analysis - optimized for speed
-// @author       kubicdar
+// @author       Dariusz Kubica (kubicdar)
+// @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
+// @license      Licensed with the consent of the author
+// @description  Fast deep container analysis with PalletLand monitoring
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
 // @grant        none
 // @run-at       document-start
+// @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
+// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
+// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
+// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
 // ==/UserScript==
 
 (function() {
