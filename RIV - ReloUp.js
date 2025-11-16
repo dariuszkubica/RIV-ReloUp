@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Fast deep container analysis - optimized for speed
 // @author       kubicdar
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
@@ -440,7 +440,7 @@
 
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.1</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.2</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Author:</strong> kubicdar</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality</p>
                 <p style="margin: 5px 0; color: #666;">
@@ -483,79 +483,192 @@
     }
 
     // Dashboard functionality
+    let originalPageContent = null;
+    let isDashboardActive = false;
+
     function showDashboard() {
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-
-        // Create modal content
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 95vw;
-            width: 1200px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        `;
-
-        modal.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-                <h2 style="margin: 0; color: #333;">📊 RIV Dashboard - Drop Zone Overview</h2>
-                <button id="close-dashboard" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                    <button id="start-scan" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">🔍 Start Full Scan</button>
-                    <button id="refresh-dashboard" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
-                    <button id="export-dashboard" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" disabled>📊 Export CSV</button>
-                </div>
-                
-                <div id="scan-progress" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span id="progress-text">Scanning Drop Zones...</span>
-                        <span id="progress-percentage">0%</span>
+        if (isDashboardActive) return; // Already showing dashboard
+        
+        isDashboardActive = true;
+        
+        // Store original page content
+        originalPageContent = document.body.innerHTML;
+        
+        // Replace entire page content with dashboard
+        document.body.innerHTML = `
+            <div id="dashboard-app" style="
+                min-height: 100vh;
+                background: #f8f9fa;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0;
+                padding: 0;
+            ">
+                <!-- Dashboard Header -->
+                <header style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 20px 30px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
+                        <div>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📊 RIV Dashboard</h1>
+                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Drop Zone Monitoring System</p>
+                        </div>
+                        <button id="close-dashboard" style="
+                            background: rgba(255,255,255,0.2);
+                            border: 1px solid rgba(255,255,255,0.3);
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                            ← Back to RIV
+                        </button>
                     </div>
-                    <div style="background: #dee2e6; height: 8px; border-radius: 4px; overflow: hidden;">
-                        <div id="progress-bar" style="background: #28a745; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-            </div>
+                </header>
 
-            <div id="dashboard-content">
-                <div style="text-align: center; padding: 50px; color: #666;">
-                    Click "Start Full Scan" to analyze Drop Zones DZ-CDPL-A01 through DZ-CDPL-A50
-                </div>
+                <!-- Dashboard Content -->
+                <main style="max-width: 1400px; margin: 0 auto; padding: 30px;">
+                    <!-- Control Panel -->
+                    <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                            <button id="start-scan" style="
+                                background: #28a745;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 2px 4px rgba(40,167,69,0.3);
+                            ">🔍 Start Full Scan</button>
+                            
+                            <button id="refresh-dashboard" style="
+                                background: #17a2b8;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 2px 4px rgba(23,162,184,0.3);
+                            ">🔄 Refresh</button>
+                            
+                            <button id="export-dashboard" disabled style="
+                                background: #6c757d;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                opacity: 0.6;
+                            ">📊 Export CSV</button>
+                            
+                            <div style="flex: 1;"></div>
+                            
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                                padding: 8px 16px;
+                                background: #f8f9fa;
+                                border-radius: 6px;
+                                font-size: 13px;
+                                color: #666;
+                            ">
+                                <span>🕒</span>
+                                <span id="last-scan-time">Never scanned</span>
+                            </div>
+                        </div>
+                        
+                        <div id="scan-progress" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <span id="progress-text" style="font-weight: 500; color: #495057;">Scanning Drop Zones...</span>
+                                <span id="progress-percentage" style="font-weight: 600; color: #28a745;">0%</span>
+                            </div>
+                            <div style="background: #dee2e6; height: 10px; border-radius: 5px; overflow: hidden;">
+                                <div id="progress-bar" style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 5px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Content Area -->
+                    <div id="dashboard-content">
+                        <div style="
+                            text-align: center;
+                            padding: 80px 20px;
+                            background: white;
+                            border-radius: 12px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        ">
+                            <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">📊</div>
+                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Welcome to RIV Dashboard</h3>
+                            <p style="color: #6c757d; margin-bottom: 30px;">Click "Start Full Scan" to analyze Drop Zones DZ-CDPL-A01 through DZ-CDPL-A50</p>
+                            <div style="
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 10px;
+                                padding: 12px 24px;
+                                background: #e3f2fd;
+                                border-radius: 6px;
+                                color: #1565c0;
+                                font-size: 14px;
+                            ">
+                                <span>💡</span>
+                                <span>Real-time monitoring of warehouse buffer zones</span>
+                            </div>
+                        </div>
+                    </div>
+                </main>
             </div>
         `;
 
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
+        // Add CSS for hover effects
+        const style = document.createElement('style');
+        style.textContent = `
+            #start-scan:hover { background: #218838 !important; transform: translateY(-1px); }
+            #refresh-dashboard:hover { background: #138496 !important; transform: translateY(-1px); }
+            #export-dashboard:not(:disabled):hover { background: #545b62 !important; transform: translateY(-1px); opacity: 1 !important; }
+            #close-dashboard:hover { background: rgba(255,255,255,0.3) !important; }
+        `;
+        document.head.appendChild(style);
 
         // Event listeners
-        document.getElementById('close-dashboard').onclick = () => overlay.remove();
+        document.getElementById('close-dashboard').onclick = () => closeDashboard();
         document.getElementById('start-scan').onclick = () => startDropZoneScan();
         document.getElementById('refresh-dashboard').onclick = () => startDropZoneScan();
         document.getElementById('export-dashboard').onclick = () => exportDashboardData();
+    }
 
-        // Close on overlay click
-        overlay.onclick = (e) => {
-            if (e.target === overlay) overlay.remove();
-        };
+    function closeDashboard() {
+        if (!isDashboardActive) return;
+        
+        isDashboardActive = false;
+        
+        // Restore original page content
+        if (originalPageContent) {
+            document.body.innerHTML = originalPageContent;
+            
+            // Re-initialize the script functionality
+            setTimeout(() => {
+                addTotalItemsColumn();
+                initializeCopyToClipboard();
+                addMenuOptions();
+            }, 100);
+        }
+        
+        originalPageContent = null;
     }
 
     // Dashboard data storage
@@ -667,6 +780,13 @@
         startBtn.disabled = false;
         refreshBtn.disabled = false;
         exportBtn.disabled = false;
+        exportBtn.style.opacity = '1';
+        
+        // Update last scan time
+        const lastScanElement = document.getElementById('last-scan-time');
+        if (lastScanElement) {
+            lastScanElement.textContent = `Last scan: ${new Date().toLocaleString('pl-PL')}`;
+        }
         
         console.log('Dashboard scan complete:', dashboardData);
     }
@@ -901,7 +1021,7 @@
     }
 
     // Auto-update functionality
-    const CURRENT_VERSION = '1.1';
+    const CURRENT_VERSION = '1.2';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     async function checkForUpdates() {
