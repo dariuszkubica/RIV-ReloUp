@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Fast deep container analysis - optimized for speed
 // @author       kubicdar
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
@@ -440,7 +440,7 @@
 
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.2</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.3</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Author:</strong> kubicdar</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality</p>
                 <p style="margin: 5px 0; color: #666;">
@@ -536,19 +536,6 @@
                     <!-- Control Panel -->
                     <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                         <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-                            <button id="start-scan" style="
-                                background: #28a745;
-                                color: white;
-                                border: none;
-                                padding: 12px 24px;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                font-size: 14px;
-                                font-weight: 500;
-                                transition: all 0.3s ease;
-                                box-shadow: 0 2px 4px rgba(40,167,69,0.3);
-                            ">🔍 Start Full Scan</button>
-                            
                             <button id="refresh-dashboard" style="
                                 background: #17a2b8;
                                 color: white;
@@ -560,7 +547,7 @@
                                 font-weight: 500;
                                 transition: all 0.3s ease;
                                 box-shadow: 0 2px 4px rgba(23,162,184,0.3);
-                            ">🔄 Refresh</button>
+                            ">🔄 Refresh Data</button>
                             
                             <button id="export-dashboard" disabled style="
                                 background: #6c757d;
@@ -588,7 +575,7 @@
                                 color: #666;
                             ">
                                 <span>🕒</span>
-                                <span id="last-scan-time">Never scanned</span>
+                                <span id="last-scan-time">Loading...</span>
                             </div>
                         </div>
                         
@@ -613,21 +600,8 @@
                             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                         ">
                             <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">📊</div>
-                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Welcome to RIV Dashboard</h3>
-                            <p style="color: #6c757d; margin-bottom: 30px;">Click "Start Full Scan" to analyze Drop Zones DZ-CDPL-A01 through DZ-CDPL-A50</p>
-                            <div style="
-                                display: inline-flex;
-                                align-items: center;
-                                gap: 10px;
-                                padding: 12px 24px;
-                                background: #e3f2fd;
-                                border-radius: 6px;
-                                color: #1565c0;
-                                font-size: 14px;
-                            ">
-                                <span>💡</span>
-                                <span>Real-time monitoring of warehouse buffer zones</span>
-                            </div>
+                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading Dashboard Data...</h3>
+                            <p style="color: #6c757d; margin-bottom: 30px;">Fetching Drop Zone information automatically</p>
                         </div>
                     </div>
                 </main>
@@ -637,7 +611,6 @@
         // Add CSS for hover effects
         const style = document.createElement('style');
         style.textContent = `
-            #start-scan:hover { background: #218838 !important; transform: translateY(-1px); }
             #refresh-dashboard:hover { background: #138496 !important; transform: translateY(-1px); }
             #export-dashboard:not(:disabled):hover { background: #545b62 !important; transform: translateY(-1px); opacity: 1 !important; }
             #close-dashboard:hover { background: rgba(255,255,255,0.3) !important; }
@@ -646,9 +619,13 @@
 
         // Event listeners
         document.getElementById('close-dashboard').onclick = () => closeDashboard();
-        document.getElementById('start-scan').onclick = () => startDropZoneScan();
         document.getElementById('refresh-dashboard').onclick = () => startDropZoneScan();
         document.getElementById('export-dashboard').onclick = () => exportDashboardData();
+        
+        // Auto-start scan when dashboard opens
+        setTimeout(() => {
+            startDropZoneScan();
+        }, 500);
     }
 
     function closeDashboard() {
@@ -680,13 +657,11 @@
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
         const progressPercentage = document.getElementById('progress-percentage');
-        const startBtn = document.getElementById('start-scan');
         const refreshBtn = document.getElementById('refresh-dashboard');
         const exportBtn = document.getElementById('export-dashboard');
         
         // Show progress and disable buttons
         progressDiv.style.display = 'block';
-        startBtn.disabled = true;
         refreshBtn.disabled = true;
         exportBtn.disabled = true;
         
@@ -700,13 +675,12 @@
         const totalZones = dropZones.length;
         let completedZones = 0;
         
-        // Get current page parameters
-        const currentUrl = window.location.href;
+        // Get current page parameters - use proper search method
         const warehouseId = 'CDPL1'; // Assuming CDPL warehouse
         const associate = 'System'; // Default associate for dashboard scans
         
         // Process zones in batches
-        const batchSize = 3; // Smaller batch size to avoid overwhelming server
+        const batchSize = 2; // Smaller batch size to avoid overwhelming server
         const batches = [];
         
         for (let i = 0; i < dropZones.length; i += batchSize) {
@@ -718,24 +692,29 @@
                 try {
                     progressText.textContent = `Scanning ${dropZoneId}...`;
                     
-                    const details = await getContainerDetails(dropZoneId, warehouseId, associate);
+                    // First do a search to get proper data structure
+                    const searchDetails = await performContainerSearch(dropZoneId, warehouseId, associate);
                     
                     let totalPallets = 0;
                     let totalUnits = 0;
                     let sortationCategory = 'N/A';
-                    let status = 'Active';
+                    let status = 'Empty';
                     
-                    if (details && details.childContainers && details.childContainers.length > 0) {
-                        totalPallets = details.childContainers.length;
-                        totalUnits = details.childContainers.reduce((sum, child) => 
-                            sum + (child.numOfChildContainers || 0), 0);
+                    if (searchDetails && searchDetails.childContainers && searchDetails.childContainers.length > 0) {
+                        status = 'Active';
+                        totalPallets = searchDetails.childContainers.length;
+                        
+                        // Calculate total units from all pallets
+                        for (const pallet of searchDetails.childContainers) {
+                            if (pallet.numOfChildContainers) {
+                                totalUnits += pallet.numOfChildContainers;
+                            }
+                        }
                         
                         // Get sortation category from first pallet
-                        if (details.childContainers[0]) {
-                            sortationCategory = details.childContainers[0].sortationCategory || 'N/A';
+                        if (searchDetails.childContainers[0]) {
+                            sortationCategory = searchDetails.childContainers[0].sortationCategory || 'N/A';
                         }
-                    } else {
-                        status = 'Empty';
                     }
                     
                     return {
@@ -777,7 +756,6 @@
         
         // Hide progress and enable buttons
         progressDiv.style.display = 'none';
-        startBtn.disabled = false;
         refreshBtn.disabled = false;
         exportBtn.disabled = false;
         exportBtn.style.opacity = '1';
@@ -789,6 +767,44 @@
         }
         
         console.log('Dashboard scan complete:', dashboardData);
+    }
+    
+    // Perform container search like the main application does
+    async function performContainerSearch(containerId, warehouseId, associate) {
+        const requestData = {
+            containerId: containerId,
+            warehouseId: warehouseId,
+            associate: associate,
+            includeChildren: true,
+            mode: "SEARCH",
+            locale: "pl-PL",
+            movingContainers: []
+        };
+        
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/getContainer', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            resolve(data);
+                        } catch (e) {
+                            reject(new Error(`Parse error: ${e.message}`));
+                        }
+                    } else {
+                        reject(new Error(`HTTP ${xhr.status}`));
+                    }
+                }
+            };
+            
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.send(JSON.stringify(requestData));
+        });
     }
     
     function updateDashboardDisplay() {
@@ -817,74 +833,58 @@
         });
         
         contentDiv.innerHTML = `
-            <!-- Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
-                <div style="background: #28a745; color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${activeZones}</h3>
-                    <p style="margin: 0; font-size: 14px;">Active Zones</p>
-                </div>
-                <div style="background: #6c757d; color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${emptyZones}</h3>
-                    <p style="margin: 0; font-size: 14px;">Empty Zones</p>
-                </div>
-                <div style="background: #17a2b8; color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${totalPalletsAll}</h3>
-                    <p style="margin: 0; font-size: 14px;">Total Pallets</p>
-                </div>
-                <div style="background: #fd7e14; color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${totalUnitsAll}</h3>
-                    <p style="margin: 0; font-size: 14px;">Total Units</p>
-                </div>
-            </div>
-            
-            <!-- Sortation Categories -->
-            <div style="margin-bottom: 30px;">
-                <h3 style="color: #333; margin-bottom: 15px;">📋 Sortation Categories</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
-                    ${Object.entries(categoryStats).map(([category, stats]) => `
-                        <div style="background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 6px;">
-                            <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">${category}</h4>
-                            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #6c757d;">
-                                <span>${stats.zones} zones</span>
-                                <span>${stats.pallets} pallets</span>
-                                <span>${stats.units} units</span>
-                            </div>
-                        </div>
-                    `).join('')}
+            <!-- Summary Statistics -->
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">📊 Summary Statistics</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #28a745;">${activeZones}</div>
+                        <div style="font-size: 14px; color: #666;">Active Zones</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #6c757d;">${emptyZones}</div>
+                        <div style="font-size: 14px; color: #666;">Empty Zones</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #17a2b8;">${totalPalletsAll}</div>
+                        <div style="font-size: 14px; color: #666;">Total Pallets</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #fd7e14;">${totalUnitsAll}</div>
+                        <div style="font-size: 14px; color: #666;">Total Units</div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Detailed Table -->
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <thead style="background: #343a40; color: white;">
-                        <tr>
-                            <th style="padding: 12px; text-align: left; font-size: 14px;">Drop Zone</th>
-                            <th style="padding: 12px; text-align: center; font-size: 14px;">Status</th>
-                            <th style="padding: 12px; text-align: center; font-size: 14px;">Pallets</th>
-                            <th style="padding: 12px; text-align: center; font-size: 14px;">Units</th>
-                            <th style="padding: 12px; text-align: left; font-size: 14px;">Sortation Category</th>
-                            <th style="padding: 12px; text-align: center; font-size: 14px;">Last Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${dashboardData.map((dz, index) => `
-                            <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
-                                <td style="padding: 10px; font-weight: bold; color: #495057;">${dz.dropZoneId}</td>
-                                <td style="padding: 10px; text-align: center;">
-                                    <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; 
-                                          background: ${dz.status === 'Active' ? '#d4edda; color: #155724' : '#f8d7da; color: #721c24'};">
-                                        ${dz.status}
-                                    </span>
-                                </td>
-                                <td style="padding: 10px; text-align: center; font-weight: bold; color: #495057;">${dz.totalPallets}</td>
-                                <td style="padding: 10px; text-align: center; font-weight: bold; color: #495057;">${dz.totalUnits}</td>
-                                <td style="padding: 10px; color: #6c757d; font-size: 12px;">${dz.sortationCategory}</td>
-                                <td style="padding: 10px; text-align: center; color: #6c757d; font-size: 11px;">${dz.lastUpdated}</td>
+            <!-- Drop Zone Table -->
+            <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">📋 Drop Zone Details</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #dee2e6;">
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Drop Zone</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Status</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Pallets</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Units</th>
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Sortation Category</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Last Updated</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${dashboardData.map((dz, index) => `
+                                <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
+                                    <td style="padding: 10px 8px; font-weight: 500; color: #495057;">${dz.dropZoneId}</td>
+                                    <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.status}</td>
+                                    <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalPallets}</td>
+                                    <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalUnits}</td>
+                                    <td style="padding: 10px 8px; color: #6c757d;">${dz.sortationCategory}</td>
+                                    <td style="padding: 10px 8px; text-align: center; color: #6c757d; font-size: 12px;">${dz.lastUpdated}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     }
@@ -1021,7 +1021,7 @@
     }
 
     // Auto-update functionality
-    const CURRENT_VERSION = '1.2';
+    const CURRENT_VERSION = '1.3';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     async function checkForUpdates() {
