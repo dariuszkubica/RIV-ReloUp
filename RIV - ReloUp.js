@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      1.7
+// @version      2.1
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -357,6 +357,27 @@
                 <span class="css-1ox0ukt">
                     <span aria-label="" role="img" aria-hidden="true" class="css-34iy07">
                         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/>
+                        </svg>
+                    </span>
+                </span>
+                <p class="css-1fz4hyd" mdn-text="">Dashboard</p>
+            </div>
+        `;
+
+        // PalletLand menu item
+        const palletlandItem = document.createElement('a');
+        palletlandItem.href = '#';
+        palletlandItem.setAttribute('data-riv-menu-item', 'palletland');
+        palletlandItem.onclick = function(e) {
+            e.preventDefault();
+            showPalletLand();
+        };
+        palletlandItem.innerHTML = `
+            <div class="footer-item">
+                <span class="css-1ox0ukt">
+                    <span aria-label="" role="img" aria-hidden="true" class="css-34iy07">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                             <path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zM10 6a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z" fill="currentColor"/>
                         </svg>
                     </span>
@@ -388,6 +409,7 @@
 
         // Add items to footer
         footer.appendChild(dashboardItem);
+        footer.appendChild(palletlandItem);
         footer.appendChild(settingsItem);
     }
 
@@ -448,6 +470,30 @@
                 
                 <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460;">
                     <strong>Example:</strong> Prefix "DZ-CDPL-A" (1-25) + Prefix "DZ-SPEC-TEST" (10-15) = DZ-CDPL-A01...A25, DZ-SPEC-TEST10...TEST15
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #555; margin-bottom: 10px;">📊 Dashboard Configuration</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="color: #666; margin-bottom: 10px;">Dashboard Segments:</h4>
+                        <div id="dashboard-segments-container" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
+                            <!-- Dashboard segments will be dynamically generated here -->
+                        </div>
+                        <button type="button" id="add-dashboard-segment" style="margin-top: 10px; padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">+ Add Dashboard Segment</button>
+                    </div>
+                    
+                    <label style="display: block; margin-bottom: 10px;">
+                        Custom Dashboard destinations (one per line):
+                        <textarea id="dashboard-custom-destinations" placeholder="DZ-CDALL&#10;DZ-SPECIAL&#10;DZ-OVERFLOW" 
+                                  style="width: 100%; height: 60px; margin-top: 5px; padding: 5px; font-family: monospace; font-size: 12px;"></textarea>
+                    </label>
+                </div>
+                
+                <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
+                    <strong>Dashboard vs PalletLand:</strong> Dashboard is for quick overview (fewer zones), PalletLand for comprehensive analysis (many zones)
                 </div>
             </div>
 
@@ -511,6 +557,7 @@
     let isDashboardActive = false;
 
     function showDashboard() {
+        console.log('🔥 DEBUG: showDashboard() called - This should open Dashboard modal');
         if (isDashboardActive) return; // Already showing dashboard
         
         isDashboardActive = true;
@@ -553,8 +600,8 @@
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
                         <div>
-                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📦 PalletLand</h1>
-                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Drop Zone Monitoring System</p>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📊 Dashboard (Quick Overview)</h1>
+                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Quick Drop Zone Overview System</p>
                         </div>
                         <button id="close-dashboard" style="
                             background: rgba(255,255,255,0.2);
@@ -641,8 +688,8 @@
                             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                         ">
                             <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">📊</div>
-                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading PalletLand Data...</h3>
-                            <p style="color: #6c757d; margin-bottom: 30px;">Fetching Drop Zone information automatically</p>
+                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading Dashboard Data...</h3>
+                            <p style="color: #6c757d; margin-bottom: 30px;">Fetching Drop Zone overview automatically</p>
                         </div>
                     </div>
                 </main>
@@ -662,7 +709,7 @@
 
         // Event listeners
         document.getElementById('close-dashboard').onclick = () => closeDashboard(overlay);
-        document.getElementById('refresh-dashboard').onclick = () => startDropZoneScan();
+        document.getElementById('refresh-dashboard').onclick = () => startDashboardScan();
         document.getElementById('export-dashboard').onclick = () => exportDashboardData();
         
         // Close on overlay click
@@ -703,7 +750,7 @@
         
         // Auto-start scan when dashboard opens
         setTimeout(() => {
-            startDropZoneScan();
+            startDashboardScan();
         }, 2000); // Longer delay to allow session capture
     }
 
@@ -718,11 +765,185 @@
         }
     }
 
+    // PalletLand modal functionality
+    function showPalletLand() {
+        console.log('🔥 DEBUG: showPalletLand() called - This should open PalletLand modal');
+        if (isDashboardActive) return; // Already showing a modal
+        
+        isDashboardActive = true;
+        
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 999999;
+            overflow-y: auto;
+            padding: 20px;
+        `;
+        
+        // Create palletland content container
+        const palletlandContainer = document.createElement('div');
+        palletlandContainer.id = 'palletland-app';
+        palletlandContainer.style.cssText = `
+            min-height: calc(100vh - 40px);
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        `;
+        
+        palletlandContainer.innerHTML = `
+                <!-- PalletLand Header -->
+                <header style="
+                    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+                    color: white;
+                    padding: 20px 30px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
+                        <div>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">🎯 PalletLand (Full Analysis)</h1>
+                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Comprehensive Drop Zone Analysis System</p>
+                        </div>
+                        <button id="close-palletland" style="
+                            background: rgba(255,255,255,0.2);
+                            border: 1px solid rgba(255,255,255,0.3);
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                            ← Back to RIV
+                        </button>
+                    </div>
+                </header>
+
+                <!-- PalletLand Content -->
+                <main style="max-width: 1400px; margin: 0 auto; padding: 30px;">
+                    <!-- Control Panel -->
+                    <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                            <button id="refresh-palletland" style="
+                                background: #6f42c1;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 2px 4px rgba(111,66,193,0.3);
+                            " onmouseover="this.style.background='#5a31a1'" onmouseout="this.style.background='#6f42c1'">🔄 Deep Scan</button>
+                            
+                            <button id="export-palletland" disabled style="
+                                background: #6c757d;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                opacity: 0.7;
+                            " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='0.7'">📊 Export CSV</button>
+                            
+                            <div style="
+                                margin-left: auto;
+                                display: flex;
+                                align-items: center;
+                                gap: 20px;
+                                font-size: 13px;
+                                color: #666;
+                            ">
+                                <span>🕒</span>
+                                <span id="palletland-last-scan-time">Loading...</span>
+                            </div>
+                        </div>
+                        
+                        <div id="palletland-scan-progress" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <span id="palletland-progress-text" style="font-weight: 500; color: #495057;">Scanning Drop Zones...</span>
+                                <span id="palletland-progress-percentage" style="color: #6c757d; font-size: 14px;">0%</span>
+                            </div>
+                            <div style="background: #dee2e6; height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="palletland-progress-bar" style="background: linear-gradient(90deg, #6f42c1, #764ba2); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PalletLand Content Area (will be populated by updatePalletLandDisplay) -->
+                    <div id="palletland-content">
+                        <div style="
+                            text-align: center;
+                            padding: 80px 20px;
+                            background: white;
+                            border-radius: 12px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        ">
+                            <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">🎯</div>
+                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading PalletLand Data...</h3>
+                            <p style="color: #6c757d; margin-bottom: 30px;">Ready for Deep Scan Analysis</p>
+                        </div>
+                    </div>
+                </main>
+        `;
+        
+        overlay.appendChild(palletlandContainer);
+        document.body.appendChild(overlay);
+        
+        // Set up event handlers
+        document.getElementById('close-palletland').onclick = function() {
+            overlay.remove();
+            isDashboardActive = false;
+        };
+        
+        document.getElementById('refresh-palletland').onclick = () => startPalletLandScan();
+        
+        document.getElementById('export-palletland').onclick = function() {
+            if (palletlandData.length === 0) {
+                alert('No data to export. Please run an analysis first.');
+                return;
+            }
+            
+            const csvContent = generateCSVExport(palletlandData);
+            downloadCSV(csvContent, 'palletland_analysis');
+        };
+        
+        // Close on overlay click
+        overlay.onclick = function(e) {
+            if (e.target === overlay) {
+                overlay.remove();
+                isDashboardActive = false;
+            }
+        };
+        
+        // Auto-start scan
+        setTimeout(() => {
+            startPalletLandScan();
+        }, 2000);
+    }
+
     // Dashboard data storage
     let dashboardData = [];
     
-    // Generate drop zone destinations based on user configuration
-    function generateDropZoneDestinations() {
+    // PalletLand data storage
+    let palletlandData = [];
+    
+    // Generate PalletLand destinations based on user configuration
+    function generatePalletLandDestinations() {
         const destinations = [];
         
         // Process each enabled segment with its full prefix
@@ -747,8 +968,36 @@
         
         return destinations;
     }
+    
+    // Generate Dashboard destinations based on user configuration
+    function generateDashboardDestinations() {
+        const destinations = [];
+        
+        // Process each enabled dashboard segment with its full prefix
+        scriptSettings.dashboardSegments.forEach(segmentConfig => {
+            if (segmentConfig.enabled && segmentConfig.prefix && segmentConfig.prefix.trim()) {
+                for (let i = segmentConfig.from; i <= segmentConfig.to; i++) {
+                    const dzNumber = i.toString().padStart(2, '0');
+                    destinations.push(`${segmentConfig.prefix}${dzNumber}`);
+                }
+            }
+        });
+        
+        // Add custom dashboard destinations
+        if (scriptSettings.dashboardCustomDestinations) {
+            const customDests = scriptSettings.dashboardCustomDestinations
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            
+            destinations.push(...customDests);
+        }
+        
+        return destinations;
+    }
 
-    async function startDropZoneScan() {
+    async function startDashboardScan() {
+        console.log('🔥 DEBUG: startDashboardScan() called - scanning Dashboard destinations');
         dashboardData = [];
         const progressDiv = document.getElementById('scan-progress');
         const progressBar = document.getElementById('progress-bar');
@@ -788,12 +1037,12 @@
         }
         
         // Show deep scanning warning
-        progressText.textContent = 'Starting deep scan - this will take longer but provides accurate unit counts...';
+        progressText.textContent = 'Starting Dashboard deep scan - accurate unit counting...';
         progressPercentage.textContent = 'Starting';
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Generate drop zone list based on configuration
-        const dropZones = generateDropZoneDestinations();
+        const dropZones = generateDashboardDestinations();
         
         if (dropZones.length === 0) {
             progressText.textContent = 'No destinations configured. Please check PalletLand settings.';
@@ -808,8 +1057,8 @@
         const totalZones = dropZones.length;
         let completedZones = 0;
         
-        // Process zones in batches (smaller batch size for deep scanning)
-        const batchSize = 1; // Single zone at a time due to deep scanning
+        // Process zones in batches (optimized for deep scanning)
+        const batchSize = 2; // Smaller batches for deep scanning accuracy
         const batches = [];
         
         for (let i = 0; i < dropZones.length; i += batchSize) {
@@ -938,6 +1187,199 @@
         }
         
         console.log('Dashboard scan complete:', dashboardData);
+    }
+    
+    // PalletLand scan function
+    async function startPalletLandScan() {
+        console.log('🔥 DEBUG: startPalletLandScan() called - scanning PalletLand destinations');
+        palletlandData = [];
+        const progressDiv = document.getElementById('palletland-scan-progress');
+        const progressBar = document.getElementById('palletland-progress-bar');
+        const progressText = document.getElementById('palletland-progress-text');
+        const progressPercentage = document.getElementById('palletland-progress-percentage');
+        const refreshBtn = document.getElementById('refresh-palletland');
+        const exportBtn = document.getElementById('export-palletland');
+        
+        // Show progress and disable buttons
+        progressDiv.style.display = 'block';
+        refreshBtn.disabled = true;
+        exportBtn.disabled = true;
+        
+        // Wait for valid session data or try to get it
+        if (!sessionData.warehouseId || !sessionData.associate || 
+            sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
+            
+            progressText.textContent = 'Waiting for valid session data...';
+            progressPercentage.textContent = '0%';
+            
+            // Try to get session data
+            try {
+                await tryToGetSessionData();
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for potential updates
+            } catch (error) {
+                console.log('Could not get session data automatically');
+            }
+            
+            // Check if we now have valid data
+            if (!sessionData.warehouseId || !sessionData.associate || 
+                sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
+                
+                progressText.textContent = 'Invalid session data - check console for details';
+                progressDiv.style.display = 'none';
+                refreshBtn.disabled = false;
+                exportBtn.disabled = false;
+                
+                alert('Could not get valid session data. Please ensure you are logged in and try refreshing the page.');
+                return;
+            }
+        }
+        
+        // Generate drop zone list based on PalletLand configuration
+        const dropZones = generatePalletLandDestinations();
+        console.log('Generated PalletLand destinations:', dropZones);
+        
+        if (dropZones.length === 0) {
+            alert('No drop zones configured. Please check your PalletLand settings.');
+            progressDiv.style.display = 'none';
+            refreshBtn.disabled = false;
+            exportBtn.disabled = false;
+            return;
+        }
+        
+        // Show scanning status
+        progressText.textContent = 'Starting PalletLand deep scan - accurate unit counting...';
+        progressPercentage.textContent = 'Starting';
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const totalZones = dropZones.length;
+        let completedZones = 0;
+        
+        // Process zones in smaller batches for deep scanning accuracy
+        const BATCH_SIZE = 2; // Smaller batches for deep scanning
+        
+        for (let i = 0; i < dropZones.length; i += BATCH_SIZE) {
+            const batch = dropZones.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(async (dropZoneId) => {
+                try {
+                    progressText.textContent = `Scanning ${dropZoneId}...`;
+                    
+                    // Use deep scanning approach for accurate unit counts
+                    const searchDetails = await performContainerSearch(dropZoneId);
+                    
+                    let totalPallets = 0;
+                    let totalUnits = 0;
+                    let sortationCategory = 'N/A';
+                    let status = 'Empty';
+                    
+                    if (searchDetails && searchDetails.childContainers && searchDetails.childContainers.length > 0) {
+                        status = 'Active';
+                        totalPallets = searchDetails.childContainers.length;
+                        
+                        // Get sortation category from first pallet
+                        if (searchDetails.childContainers[0]) {
+                            const firstPallet = searchDetails.childContainers[0];
+                            if (firstPallet.sortationCategories && Array.isArray(firstPallet.sortationCategories) && firstPallet.sortationCategories.length > 0) {
+                                sortationCategory = firstPallet.sortationCategories[0];
+                            } else if (firstPallet.sortationCategory) {
+                                sortationCategory = firstPallet.sortationCategory;
+                            }
+                        }
+                        
+                        // Deep scan: Get actual units from each pallet for accuracy
+                        progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
+                        
+                        for (const pallet of searchDetails.childContainers) {
+                            try {
+                                // Get detailed contents of this pallet
+                                const palletDetails = await performContainerSearch(pallet.containerId);
+                                
+                                if (palletDetails && palletDetails.childContainers && Array.isArray(palletDetails.childContainers)) {
+                                    // Count units in this pallet
+                                    const palletUnits = palletDetails.childContainers.reduce((sum, tote) => {
+                                        return sum + (tote.numOfChildContainers || 0);
+                                    }, 0);
+                                    
+                                    totalUnits += palletUnits;
+                                }
+                            } catch (palletError) {
+                                console.warn(`⚠️ Error scanning pallet ${pallet.containerId}:`, palletError.message);
+                                // Continue with other pallets even if one fails
+                            }
+                        }
+                    }
+                    
+                    return {
+                        dropZoneId: dropZoneId,
+                        status: status,
+                        palletCount: totalPallets,
+                        unitCount: totalUnits,
+                        sortationCategory: sortationCategory,
+                        lastUpdated: new Date().toLocaleTimeString()
+                    };
+                } catch (error) {
+                    console.warn(`❌ Error scanning ${dropZoneId}:`, error.message);
+                    
+                    // Check if it's just an empty zone (HTTP 400 usually means empty)
+                    if (error.message.includes('HTTP 400') || error.message.includes('not found') || error.message.includes('empty')) {
+                        return {
+                            dropZoneId: dropZoneId,
+                            status: 'Empty',
+                            palletCount: 0,
+                            unitCount: 0,
+                            sortationCategory: 'N/A',
+                            lastUpdated: new Date().toLocaleTimeString()
+                        };
+                    } else {
+                        // Only mark as Error if it's a real error, not just empty
+                        return {
+                            dropZoneId: dropZoneId,
+                            status: 'Error',
+                            palletCount: 0,
+                            unitCount: 0,
+                            sortationCategory: 'Error',
+                            lastUpdated: new Date().toLocaleTimeString()
+                        };
+                    }
+                }
+            });
+            
+            // Wait for batch to complete
+            const batchResults = await Promise.all(batchPromises);
+            palletlandData.push(...batchResults);
+            
+            completedZones += batch.length;
+            const percentage = Math.round((completedZones / totalZones) * 100);
+            
+            progressBar.style.width = `${percentage}%`;
+            progressPercentage.textContent = `${percentage}%`;
+            progressText.textContent = `Scanned ${completedZones}/${totalZones} zones`;
+            
+            // Update display
+            updatePalletLandDisplay();
+            
+            // Reduced delay for speed - just enough to show progress
+            if (i + BATCH_SIZE < dropZones.length) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        
+        // Final update
+        progressText.textContent = `Scan complete! Found ${palletlandData.filter(d => d.status === 'Active').length} active zones`;
+        progressPercentage.textContent = '100%';
+        progressBar.style.width = '100%';
+        
+        // Hide progress and enable buttons
+        progressDiv.style.display = 'none';
+        refreshBtn.disabled = false;
+        exportBtn.disabled = false;
+        
+        // Update last scan time
+        const lastScanElement = document.getElementById('palletland-last-scan-time');
+        if (lastScanElement) {
+            lastScanElement.textContent = `Last scan: ${new Date().toLocaleString('pl-PL')}`;
+        }
+        
+        console.log('PalletLand scan complete:', palletlandData);
     }
     
     // Try to get valid session data by examining page content and network requests
@@ -1307,6 +1749,155 @@
         
         console.log('Dashboard data exported:', csvData.length, 'records');
     }
+    
+    // Update PalletLand display
+    function updatePalletLandDisplay() {
+        const contentDiv = document.getElementById('palletland-content');
+        if (!contentDiv || palletlandData.length === 0) return;
+        
+        // Calculate summary stats (using different field names than Dashboard)
+        const totalZones = palletlandData.length;
+        const activeZones = palletlandData.filter(dz => dz.status === 'Active').length;
+        const emptyZones = palletlandData.filter(dz => dz.status === 'Empty').length;
+        const errorZones = palletlandData.filter(dz => dz.status === 'Error').length;
+        const totalPalletsAll = palletlandData.reduce((sum, dz) => sum + (dz.palletCount || 0), 0);
+        const totalUnitsAll = palletlandData.reduce((sum, dz) => sum + (dz.unitCount || 0), 0);
+        
+        // Group by category (A, B, C, D) and sortation category
+        const categoryStats = {};
+        const sortationStats = {};
+        
+        palletlandData.forEach(dz => {
+            const category = dz.dropZoneId.match(/DZ-CDPL-([ABCD])/)?.[1] || 'Unknown';
+            if (!categoryStats[category]) {
+                categoryStats[category] = { total: 0, active: 0, empty: 0, error: 0, pallets: 0, units: 0 };
+            }
+            categoryStats[category].total++;
+            if (dz.status === 'Active') {
+                categoryStats[category].active++;
+                categoryStats[category].pallets += dz.palletCount || 0;
+                categoryStats[category].units += dz.unitCount || 0;
+                
+                // Count sortation categories
+                const sortCat = dz.sortationCategory;
+                if (sortCat && sortCat !== 'N/A' && sortCat !== 'Empty') {
+                    if (!sortationStats[sortCat]) {
+                        sortationStats[sortCat] = { zones: 0, pallets: 0, units: 0 };
+                    }
+                    sortationStats[sortCat].zones++;
+                    sortationStats[sortCat].pallets += dz.palletCount || 0;
+                    sortationStats[sortCat].units += dz.unitCount || 0;
+                }
+            } else if (dz.status === 'Empty') {
+                categoryStats[category].empty++;
+            } else if (dz.status === 'Error') {
+                categoryStats[category].error++;
+            }
+        });
+        
+        contentDiv.innerHTML = `
+            <!-- Summary Statistics -->
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 PalletLand Summary Statistics</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #28a745;">${activeZones}</div>
+                        <div style="font-size: 14px; color: #666;">Active Zones</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #6c757d;">${emptyZones}</div>
+                        <div style="font-size: 14px; color: #666;">Empty Zones</div>
+                    </div>
+                    ${errorZones > 0 ? `
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #dc3545;">${errorZones}</div>
+                        <div style="font-size: 14px; color: #666;">Error Zones</div>
+                    </div>
+                    ` : ''}
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #6f42c1;">${totalPalletsAll}</div>
+                        <div style="font-size: 14px; color: #666;">Total Pallets</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #764ba2;">${totalUnitsAll}</div>
+                        <div style="font-size: 14px; color: #666;">Total Units</div>
+                    </div>
+                </div>
+                
+                <!-- Category Breakdown -->
+                <h4 style="margin: 20px 0 15px 0; color: #555;">📂 By Category:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    ${Object.keys(categoryStats).sort().map(category => `
+                        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${category === 'A' ? '#28a745' : category === 'B' ? '#17a2b8' : category === 'C' ? '#ffc107' : '#6f42c1'};">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px;">Category ${category}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Active: <strong>${categoryStats[category].active}</strong> / ${categoryStats[category].total}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${categoryStats[category].pallets}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${categoryStats[category].units}</strong></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Sortation Categories -->
+            ${Object.keys(sortationStats).length > 0 ? `
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">🏷️ Sortation Categories</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    ${Object.keys(sortationStats).sort().map(category => `
+                        <div style="padding: 15px; background: #f1f3f4; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px; font-size: 14px;">${category}</div>
+                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${sortationStats[category].zones}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            
+            <!-- Drop Zone Table -->
+            <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">📋 Drop Zone Details</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #dee2e6;">
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Drop Zone</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Status</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Pallets</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Units</th>
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Sortation Category</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${palletlandData.map((dz, index) => {
+                                const statusColor = dz.status === 'Active' ? '#28a745' : 
+                                                   dz.status === 'Empty' ? '#6c757d' : '#dc3545';
+                                const categoryColor = dz.dropZoneId.includes('-A') ? '#28a745' :
+                                                     dz.dropZoneId.includes('-B') ? '#17a2b8' :
+                                                     dz.dropZoneId.includes('-C') ? '#ffc107' : '#6f42c1';
+                                
+                                return `
+                                <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
+                                    <td style="padding: 10px 8px; font-weight: 500; color: ${categoryColor};">${dz.dropZoneId}</td>
+                                    <td style="padding: 10px 8px; text-align: center;">
+                                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; 
+                                                     color: white; background: ${statusColor};">${dz.status}</span>
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; font-weight: 600;">${dz.palletCount || 0}</td>
+                                    <td style="padding: 10px 8px; text-align: center; font-weight: 600; color: #6f42c1;">${dz.unitCount || 0}</td>
+                                    <td style="padding: 10px 8px; font-weight: 500;">${dz.sortationCategory || 'N/A'}</td>
+                                    <td style="padding: 10px 8px; text-align: center; font-size: 11px; color: #6c757d;">${dz.lastUpdated || 'Unknown'}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
 
     // Settings storage
     let scriptSettings = {
@@ -1321,10 +1912,15 @@
             { prefix: 'DZ-CDPL-B', from: 1, to: 50, enabled: true },
             { prefix: 'DZ-CDPL-C', from: 1, to: 50, enabled: true }
         ],
-        palletlandCustomDestinations: ''
+        palletlandCustomDestinations: '',
+        // Dashboard configuration
+        dashboardSegments: [
+            { prefix: 'DZ-CD', from: 1, to: 26, enabled: true }
+        ],
+        dashboardCustomDestinations: 'DZ-CDALL'
     };
 
-    // Segment management functions (global for onclick access)
+    // PalletLand segment management functions (global for onclick access)
     window.updateSegmentEnabled = function(index, enabled) {
         if (scriptSettings.palletlandSegments[index]) {
             scriptSettings.palletlandSegments[index].enabled = enabled;
@@ -1354,6 +1950,36 @@
         loadSegments();
     };
 
+    // Dashboard segment management functions
+    window.updateDashboardSegmentEnabled = function(index, enabled) {
+        if (scriptSettings.dashboardSegments[index]) {
+            scriptSettings.dashboardSegments[index].enabled = enabled;
+        }
+    };
+
+    window.updateDashboardSegmentPrefix = function(index, prefix) {
+        if (scriptSettings.dashboardSegments[index]) {
+            scriptSettings.dashboardSegments[index].prefix = prefix;
+        }
+    };
+
+    window.updateDashboardSegmentFrom = function(index, from) {
+        if (scriptSettings.dashboardSegments[index]) {
+            scriptSettings.dashboardSegments[index].from = parseInt(from) || 1;
+        }
+    };
+
+    window.updateDashboardSegmentTo = function(index, to) {
+        if (scriptSettings.dashboardSegments[index]) {
+            scriptSettings.dashboardSegments[index].to = parseInt(to) || 26;
+        }
+    };
+
+    window.removeDashboardSegment = function(index) {
+        scriptSettings.dashboardSegments.splice(index, 1);
+        loadDashboardSegments();
+    };
+
     function loadSegments() {
         const container = document.getElementById('segments-container');
         if (!container) return;
@@ -1372,6 +1998,50 @@
     function addNewSegment() {
         scriptSettings.palletlandSegments.push({ prefix: 'DZ-NEW-', from: 1, to: 50, enabled: true });
         loadSegments();
+    }
+    
+    function loadDashboardSegments() {
+        const container = document.getElementById('dashboard-segments-container');
+        if (!container) return;
+        
+        container.innerHTML = scriptSettings.dashboardSegments
+            .map((segment, index) => createDashboardSegmentElement(segment, index))
+            .join('');
+            
+        // Setup event listeners for Add Dashboard Segment button
+        const addBtn = document.getElementById('add-dashboard-segment');
+        if (addBtn) {
+            addBtn.onclick = addNewDashboardSegment;
+        }
+    }
+
+    function addNewDashboardSegment() {
+        scriptSettings.dashboardSegments.push({ prefix: 'DZ-NEW-', from: 1, to: 26, enabled: true });
+        loadDashboardSegments();
+    }
+    
+    function createDashboardSegmentElement(segment, index) {
+        return `
+            <div style="margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 8px; background: white; border-radius: 4px;">
+                <input type="checkbox" ${segment.enabled ? 'checked' : ''} 
+                       onchange="updateDashboardSegmentEnabled(${index}, this.checked)"
+                       style="margin-right: 5px;">
+                <span style="margin-right: 5px; font-size: 12px;">prefix:</span>
+                <input type="text" value="${segment.prefix}" 
+                       onchange="updateDashboardSegmentPrefix(${index}, this.value)"
+                       style="width: 120px; margin-right: 8px; padding: 3px; font-family: monospace; font-weight: bold;">
+                <span style="margin-right: 5px; font-size: 12px;">from:</span>
+                <input type="number" value="${segment.from}" min="1" max="999" 
+                       onchange="updateDashboardSegmentFrom(${index}, this.value)"
+                       style="width: 50px; margin-right: 8px; padding: 3px;">
+                <span style="margin-right: 5px; font-size: 12px;">to:</span>
+                <input type="number" value="${segment.to}" min="1" max="999" 
+                       onchange="updateDashboardSegmentTo(${index}, this.value)"
+                       style="width: 50px; margin-right: 8px; padding: 3px;">
+                <button type="button" onclick="removeDashboardSegment(${index})" 
+                        style="background: #ff4444; color: white; border: none; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px;">×</button>
+            </div>
+        `;
     }
 
     function createSegmentElement(segment, index) {
@@ -1413,6 +2083,9 @@
         
         // PalletLand settings
         const customDestInput = document.getElementById('custom-destinations');
+        
+        // Dashboard settings
+        const dashboardCustomDestInput = document.getElementById('dashboard-custom-destinations');
 
         if (filenamePrefixInput) filenamePrefixInput.value = scriptSettings.filenamePrefix;
         if (includeTimestampInput) includeTimestampInput.checked = scriptSettings.includeTimestamp;
@@ -1420,8 +2093,12 @@
         // PalletLand settings
         if (customDestInput) customDestInput.value = scriptSettings.palletlandCustomDestinations || '';
         
+        // Dashboard settings
+        if (dashboardCustomDestInput) dashboardCustomDestInput.value = scriptSettings.dashboardCustomDestinations || '';
+        
         // Load segments configuration
         loadSegments();
+        loadDashboardSegments();
     }
     
     async function checkUpdateStatus() {
@@ -1482,12 +2159,18 @@
         
         // PalletLand settings
         const customDestInput = document.getElementById('custom-destinations');
+        
+        // Dashboard settings
+        const dashboardCustomDestInput = document.getElementById('dashboard-custom-destinations');
 
         scriptSettings.filenamePrefix = filenamePrefixInput?.value || 'RIV';
         scriptSettings.includeTimestamp = includeTimestampInput?.checked || false;
         
         // PalletLand settings
         scriptSettings.palletlandCustomDestinations = customDestInput?.value || '';
+        
+        // Dashboard settings
+        scriptSettings.dashboardCustomDestinations = dashboardCustomDestInput?.value || '';
         
         // Segments are already updated in real-time via the update functions
 
