@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.4
+// @version      3.5
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -225,12 +225,66 @@
         return Array.from(destinations).sort().join(', ');
     }
     
-    // Global session data storage
+    // Global session data storage with localStorage persistence
     let sessionData = {
         warehouseId: null,
         associate: null,
         sessionId: null,
-        lastCaptured: null
+        lastCaptured: null,
+        
+        // Save session data to localStorage
+        save() {
+            try {
+                const dataToSave = {
+                    warehouseId: this.warehouseId,
+                    associate: this.associate,
+                    sessionId: this.sessionId,
+                    lastCaptured: this.lastCaptured
+                };
+                localStorage.setItem('riv_session_data', JSON.stringify(dataToSave));
+                console.log('📄 Session data saved to localStorage:', dataToSave);
+            } catch (e) {
+                console.warn('Failed to save session data to localStorage:', e);
+            }
+        },
+        
+        // Load session data from localStorage
+        load() {
+            try {
+                const saved = localStorage.getItem('riv_session_data');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    // Only restore if the data is relatively recent (within 24 hours)
+                    const lastCaptured = data.lastCaptured ? new Date(data.lastCaptured) : null;
+                    const now = new Date();
+                    const dayInMs = 24 * 60 * 60 * 1000;
+                    
+                    if (lastCaptured && (now - lastCaptured) < dayInMs) {
+                        this.warehouseId = data.warehouseId;
+                        this.associate = data.associate;
+                        this.sessionId = data.sessionId;
+                        this.lastCaptured = data.lastCaptured;
+                        console.log('📥 Session data restored from localStorage:', data);
+                        return true;
+                    } else {
+                        console.log('📅 Stored session data is too old, ignoring');
+                        localStorage.removeItem('riv_session_data');
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to load session data from localStorage:', e);
+            }
+            return false;
+        },
+        
+        // Update session data and save automatically
+        update(warehouseId, associate, sessionId = null) {
+            this.warehouseId = warehouseId;
+            this.associate = associate;
+            this.sessionId = sessionId;
+            this.lastCaptured = new Date().toISOString();
+            this.save();
+        }
     };
     
     // Add Total Items column to existing DROP_ZONE table
@@ -2062,15 +2116,14 @@
             if (url && url.includes('/api/getContainer') && options && options.body) {
                 try {
                     const requestData = JSON.parse(options.body);
-                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
-                        sessionData.warehouseId = requestData.warehouseId;
-                        console.log('🎯 [Fetch] Captured warehouseId:', requestData.warehouseId);
+                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1' &&
+                        requestData.associate && requestData.associate !== 'System') {
+                        sessionData.update(requestData.warehouseId, requestData.associate);
+                        console.log('✅ Session data captured from fetch:', { 
+                            warehouseId: requestData.warehouseId, 
+                            associate: requestData.associate 
+                        });
                     }
-                    if (requestData.associate && requestData.associate !== 'System') {
-                        sessionData.associate = requestData.associate;
-                        console.log('🎯 [Fetch] Captured associate:', requestData.associate);
-                    }
-                    sessionData.lastCaptured = new Date();
                     
                     // Log session data capture
                     if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
@@ -2098,15 +2151,14 @@
             if (this._rivUrl && this._rivUrl.includes('/api/getContainer') && data) {
                 try {
                     const requestData = JSON.parse(data);
-                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
-                        sessionData.warehouseId = requestData.warehouseId;
-                        console.log('🎯 [XHR] Captured warehouseId:', requestData.warehouseId);
+                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1' &&
+                        requestData.associate && requestData.associate !== 'System') {
+                        sessionData.update(requestData.warehouseId, requestData.associate);
+                        console.log('✅ Session data captured from XHR:', {
+                            warehouseId: requestData.warehouseId,
+                            associate: requestData.associate
+                        });
                     }
-                    if (requestData.associate && requestData.associate !== 'System') {
-                        sessionData.associate = requestData.associate;
-                        console.log('🎯 [XHR] Captured associate:', requestData.associate);
-                    }
-                    sessionData.lastCaptured = new Date();
                     
                     // Log session data capture
                     if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
@@ -2163,11 +2215,9 @@
                         
                         if (warehouseMatch && warehouseMatch[1] !== 'CDPL1') {
                             warehouseId = warehouseMatch[1];
-                            sessionData.warehouseId = warehouseId;
                         }
                         if (associateMatch && associateMatch[1] !== 'System') {
                             associate = associateMatch[1];
-                            sessionData.associate = associate;
                         }
                     }
                 }
@@ -2179,16 +2229,19 @@
                 
                 if (warehouseUrlMatch) {
                     warehouseId = warehouseUrlMatch[1];
-                    sessionData.warehouseId = warehouseId;
                 }
                 if (userUrlMatch) {
                     associate = userUrlMatch[1];
-                    sessionData.associate = associate;
                 }
                 
             } catch (e) {
                 console.warn('🔧 Could not extract session data, using defaults:', e.message);
             }
+        }
+        
+        // Update session data if we have valid values
+        if (warehouseId !== 'CDPL1' && associate !== 'System') {
+            sessionData.update(warehouseId, associate);
         }
         
         console.log(`🔍 Performing search for ${containerId} with warehouseId: ${warehouseId}, associate: ${associate}`);
@@ -3565,10 +3618,8 @@
                 if (requestData.warehouseId && requestData.associate) {
                     // Only update if we get non-default values
                     if (requestData.warehouseId !== 'CDPL1' && requestData.associate !== 'System') {
-                        sessionData.warehouseId = requestData.warehouseId;
-                        sessionData.associate = requestData.associate;
-                        sessionData.lastCaptured = new Date();
-                        console.log(`🔐 Valid session data captured: warehouseId=${sessionData.warehouseId}, associate=${sessionData.associate}`);
+                        sessionData.update(requestData.warehouseId, requestData.associate);
+                        console.log(`🔐 Valid session data captured: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
                     } else {
                         console.warn(`🚫 Skipped default session data: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
                     }
@@ -3622,6 +3673,14 @@
     
     // Initialize
     const init = () => {
+        console.log('🔄 RIV - ReloUp initializing...');
+        
+        // Restore session data from localStorage first
+        const sessionRestored = sessionData.load();
+        if (sessionRestored) {
+            console.log('🔄 Session data successfully restored from previous session');
+        }
+        
         addTotalItemsColumn();
         initializeCopyToClipboard();
         addMenuOptions();
@@ -3632,19 +3691,24 @@
             // First start monitoring for real requests
             startSessionMonitoring();
             
-            // Then try auto-loading with more aggressive strategy
-            autoLoadSessionData().then((success) => {
-                if (success) {
-                    // Start periodic refresh after initial load
-                    startSessionRefresh();
-                } else {
-                    // If auto-loading failed, try again in 10 seconds
-                    setTimeout(() => {
-                        console.log('🔄 Retrying session data load...');
-                        autoLoadSessionData();
-                    }, 10000);
-                }
-            });
+            // Then try auto-loading only if not restored from localStorage
+            if (!sessionRestored) {
+                autoLoadSessionData().then((success) => {
+                    if (success) {
+                        // Start periodic refresh after initial load
+                        startSessionRefresh();
+                    } else {
+                        // If auto-loading failed, try again in 10 seconds
+                        setTimeout(() => {
+                            console.log('🔄 Retrying session data load...');
+                            autoLoadSessionData();
+                        }, 10000);
+                    }
+                });
+            } else {
+                // If session was restored, still start periodic refresh
+                startSessionRefresh();
+            }
         }, 3000); // Wait longer for page to be fully loaded
         
         // Check for updates (delayed to not interfere with main functionality)
