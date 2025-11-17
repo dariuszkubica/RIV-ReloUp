@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      1.3
+// @version      1.7
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -428,24 +428,27 @@
             </div>
             
             <div style="margin-bottom: 20px;">
-                <h3 style="color: #555; margin-bottom: 10px;">📊 Analysis Settings</h3>
-                <label style="display: block; margin-bottom: 10px;">
-                    <input type="number" id="batch-size" value="5" min="1" max="20" style="width: 60px; margin-right: 10px;">
-                    Batch Size (containers processed simultaneously)
-                </label>
-                <small style="color: #666;">Higher values = faster analysis but more server load</small>
-            </div>
-
-            <div style="margin-bottom: 20px;">
-                <h3 style="color: #555; margin-bottom: 10px;">📋 Copy Settings</h3>
-                <label style="display: block; margin-bottom: 10px;">
-                    <input type="checkbox" id="show-copy-tooltip" checked style="margin-right: 10px;">
-                    Show tooltip when copying (Ctrl + Click)
-                </label>
-                <label style="display: block; margin-bottom: 10px;">
-                    <input type="checkbox" id="highlight-copied-cell" checked style="margin-right: 10px;">
-                    Highlight copied cell
-                </label>
+                <h3 style="color: #555; margin-bottom: 10px;">📦 PalletLand Configuration</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="color: #666; margin-bottom: 10px;">Destination Segments:</h4>
+                        <div id="segments-container" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
+                            <!-- Segments will be dynamically generated here -->
+                        </div>
+                        <button type="button" id="add-segment" style="margin-top: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">+ Add Segment</button>
+                    </div>
+                    
+                    <label style="display: block; margin-bottom: 10px;">
+                        Custom destinations (one per line):
+                        <textarea id="custom-destinations" placeholder="DZ-SPECIAL-01&#10;DZ-TEST-A05&#10;DZ-CUSTOM-B12" 
+                                  style="width: 100%; height: 60px; margin-top: 5px; padding: 5px; font-family: monospace; font-size: 12px;"></textarea>
+                    </label>
+                </div>
+                
+                <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460;">
+                    <strong>Example:</strong> Prefix "DZ-CDPL-A" (1-25) + Prefix "DZ-SPEC-TEST" (10-15) = DZ-CDPL-A01...A25, DZ-SPEC-TEST10...TEST15
+                </div>
             </div>
 
             <div style="margin-bottom: 20px;">
@@ -718,6 +721,33 @@
     // Dashboard data storage
     let dashboardData = [];
     
+    // Generate drop zone destinations based on user configuration
+    function generateDropZoneDestinations() {
+        const destinations = [];
+        
+        // Process each enabled segment with its full prefix
+        scriptSettings.palletlandSegments.forEach(segmentConfig => {
+            if (segmentConfig.enabled && segmentConfig.prefix && segmentConfig.prefix.trim()) {
+                for (let i = segmentConfig.from; i <= segmentConfig.to; i++) {
+                    const dzNumber = i.toString().padStart(2, '0');
+                    destinations.push(`${segmentConfig.prefix}${dzNumber}`);
+                }
+            }
+        });
+        
+        // Add custom destinations
+        if (scriptSettings.palletlandCustomDestinations) {
+            const customDests = scriptSettings.palletlandCustomDestinations
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            
+            destinations.push(...customDests);
+        }
+        
+        return destinations;
+    }
+
     async function startDropZoneScan() {
         dashboardData = [];
         const progressDiv = document.getElementById('scan-progress');
@@ -762,16 +792,18 @@
         progressPercentage.textContent = 'Starting';
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Generate drop zone list (DZ-CDPL-A01 to DZ-CDPL-D50)
-        const dropZones = [];
-        const categories = ['A', 'B', 'C', 'D'];
+        // Generate drop zone list based on configuration
+        const dropZones = generateDropZoneDestinations();
         
-        categories.forEach(category => {
-            for (let i = 1; i <= 50; i++) {
-                const dzNumber = i.toString().padStart(2, '0');
-                dropZones.push(`DZ-CDPL-${category}${dzNumber}`);
-            }
-        });
+        if (dropZones.length === 0) {
+            progressText.textContent = 'No destinations configured. Please check PalletLand settings.';
+            progressPercentage.textContent = 'Error';
+            refreshBtn.disabled = false;
+            exportBtn.disabled = false;
+            return;
+        }
+        
+        console.log(`PalletLand will scan ${dropZones.length} destinations:`, dropZones);
         
         const totalZones = dropZones.length;
         let completedZones = 0;
@@ -1281,9 +1313,89 @@
         batchSize: 5,
         showCopyTooltip: true,
         highlightCopiedCell: true,
-        filenamePrefix: 'container_analysis',
-        includeTimestamp: true
+        filenamePrefix: 'RIV',
+        includeTimestamp: true,
+        // PalletLand configuration
+        palletlandSegments: [
+            { prefix: 'DZ-CDPL-A', from: 1, to: 50, enabled: true },
+            { prefix: 'DZ-CDPL-B', from: 1, to: 50, enabled: true },
+            { prefix: 'DZ-CDPL-C', from: 1, to: 50, enabled: true }
+        ],
+        palletlandCustomDestinations: ''
     };
+
+    // Segment management functions (global for onclick access)
+    window.updateSegmentEnabled = function(index, enabled) {
+        if (scriptSettings.palletlandSegments[index]) {
+            scriptSettings.palletlandSegments[index].enabled = enabled;
+        }
+    };
+
+    window.updateSegmentPrefix = function(index, prefix) {
+        if (scriptSettings.palletlandSegments[index]) {
+            scriptSettings.palletlandSegments[index].prefix = prefix;
+        }
+    };
+
+    window.updateSegmentFrom = function(index, from) {
+        if (scriptSettings.palletlandSegments[index]) {
+            scriptSettings.palletlandSegments[index].from = parseInt(from) || 1;
+        }
+    };
+
+    window.updateSegmentTo = function(index, to) {
+        if (scriptSettings.palletlandSegments[index]) {
+            scriptSettings.palletlandSegments[index].to = parseInt(to) || 50;
+        }
+    };
+
+    window.removeSegment = function(index) {
+        scriptSettings.palletlandSegments.splice(index, 1);
+        loadSegments();
+    };
+
+    function loadSegments() {
+        const container = document.getElementById('segments-container');
+        if (!container) return;
+        
+        container.innerHTML = scriptSettings.palletlandSegments
+            .map((segment, index) => createSegmentElement(segment, index))
+            .join('');
+            
+        // Setup event listeners for Add Segment button
+        const addBtn = document.getElementById('add-segment');
+        if (addBtn) {
+            addBtn.onclick = addNewSegment;
+        }
+    }
+
+    function addNewSegment() {
+        scriptSettings.palletlandSegments.push({ prefix: 'DZ-NEW-', from: 1, to: 50, enabled: true });
+        loadSegments();
+    }
+
+    function createSegmentElement(segment, index) {
+        return `
+            <div class="segment-item" data-index="${index}" style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; border: 1px solid #ccc; border-radius: 3px; background: #fff;">
+                <input type="checkbox" ${segment.enabled ? 'checked' : ''} 
+                       onchange="updateSegmentEnabled(${index}, this.checked)" 
+                       style="margin-right: 8px;">
+                <input type="text" value="${segment.prefix}" placeholder="DZ-CDPL-A" 
+                       onchange="updateSegmentPrefix(${index}, this.value)"
+                       style="width: 120px; margin-right: 8px; padding: 3px; font-family: monospace; font-weight: bold;">
+                <span style="margin-right: 5px; font-size: 12px;">from:</span>
+                <input type="number" value="${segment.from}" min="1" max="999" 
+                       onchange="updateSegmentFrom(${index}, this.value)"
+                       style="width: 50px; margin-right: 8px; padding: 3px;">
+                <span style="margin-right: 5px; font-size: 12px;">to:</span>
+                <input type="number" value="${segment.to}" min="1" max="999" 
+                       onchange="updateSegmentTo(${index}, this.value)"
+                       style="width: 50px; margin-right: 8px; padding: 3px;">
+                <button type="button" onclick="removeSegment(${index})" 
+                        style="background: #ff4444; color: white; border: none; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px;">×</button>
+            </div>
+        `;
+    }
 
     function loadSettings() {
         try {
@@ -1296,17 +1408,20 @@
         }
 
         // Apply settings to modal
-        const batchSizeInput = document.getElementById('batch-size');
-        const showTooltipInput = document.getElementById('show-copy-tooltip');
-        const highlightCellInput = document.getElementById('highlight-copied-cell');
         const filenamePrefixInput = document.getElementById('filename-prefix');
         const includeTimestampInput = document.getElementById('include-timestamp');
+        
+        // PalletLand settings
+        const customDestInput = document.getElementById('custom-destinations');
 
-        if (batchSizeInput) batchSizeInput.value = scriptSettings.batchSize;
-        if (showTooltipInput) showTooltipInput.checked = scriptSettings.showCopyTooltip;
-        if (highlightCellInput) highlightCellInput.checked = scriptSettings.highlightCopiedCell;
         if (filenamePrefixInput) filenamePrefixInput.value = scriptSettings.filenamePrefix;
         if (includeTimestampInput) includeTimestampInput.checked = scriptSettings.includeTimestamp;
+        
+        // PalletLand settings
+        if (customDestInput) customDestInput.value = scriptSettings.palletlandCustomDestinations || '';
+        
+        // Load segments configuration
+        loadSegments();
     }
     
     async function checkUpdateStatus() {
@@ -1362,17 +1477,19 @@
 
     function saveSettings() {
         // Get values from modal
-        const batchSizeInput = document.getElementById('batch-size');
-        const showTooltipInput = document.getElementById('show-copy-tooltip');
-        const highlightCellInput = document.getElementById('highlight-copied-cell');
         const filenamePrefixInput = document.getElementById('filename-prefix');
         const includeTimestampInput = document.getElementById('include-timestamp');
+        
+        // PalletLand settings
+        const customDestInput = document.getElementById('custom-destinations');
 
-        scriptSettings.batchSize = parseInt(batchSizeInput?.value) || 5;
-        scriptSettings.showCopyTooltip = showTooltipInput?.checked || false;
-        scriptSettings.highlightCopiedCell = highlightCellInput?.checked || false;
-        scriptSettings.filenamePrefix = filenamePrefixInput?.value || 'container_analysis';
+        scriptSettings.filenamePrefix = filenamePrefixInput?.value || 'RIV';
         scriptSettings.includeTimestamp = includeTimestampInput?.checked || false;
+        
+        // PalletLand settings
+        scriptSettings.palletlandCustomDestinations = customDestInput?.value || '';
+        
+        // Segments are already updated in real-time via the update functions
 
         try {
             localStorage.setItem('riv-reloup-settings', JSON.stringify(scriptSettings));
@@ -1383,7 +1500,7 @@
     }
 
     // Auto-update functionality
-    const CURRENT_VERSION = '1.3';
+    const CURRENT_VERSION = '1.7';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     async function checkForUpdates() {
@@ -1723,7 +1840,7 @@
         collectedContainerData = [];
         
         // Process containers in parallel batches for maximum speed
-        const batchSize = scriptSettings.batchSize || 5; // Use setting or default to 5
+        const batchSize = 5; // Fixed batch size for processing
         const batches = [];
         
         for (let i = 0; i < childContainers.length; i += batchSize) {
