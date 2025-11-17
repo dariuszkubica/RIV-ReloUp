@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.3
+// @version      3.4
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -2493,15 +2493,15 @@
             <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <h3 style="margin: 0 0 20px 0; color: #333;">📋 Drop Zone Details</h3>
                 <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse;">
+                    <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                         <thead>
                             <tr style="border-bottom: 2px solid #dee2e6;">
-                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Drop Zone</th>
-                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Status</th>
-                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Pallets</th>
-                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Units</th>
-                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057;">Sortation Category</th>
-                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057;">Last Updated</th>
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; width: 15%;">Drop Zone</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 10%;">Status</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 10%;">Pallets</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 10%;">Units</th>
+                                <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; width: 35%;">Sortation Category</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 20%;">Last Updated</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2512,18 +2512,34 @@
                                                      dz.dropZoneId.includes('-B') ? '#17a2b8' :
                                                      dz.dropZoneId.includes('-C') ? '#ffc107' : '#dc3545';
                                 
+                                // Format sortation categories with commas if multiple
+                                const sortationDisplay = dz.sortationCategory && dz.sortationCategory !== 'N/A' && dz.sortationCategory !== 'Empty' 
+                                    ? dz.sortationCategory.split(',').map(cat => cat.trim()).join(', ')
+                                    : (dz.sortationCategory || 'N/A');
+                                
+                                // Check if has multiple categories (excluding DZ-CD-ALL)
+                                const allCategories = dz.sortationCategory && dz.sortationCategory !== 'N/A' && dz.sortationCategory !== 'Empty' 
+                                    ? dz.sortationCategory.split(',').map(cat => cat.trim()).filter(cat => cat)
+                                    : [];
+                                
+                                // Don't highlight DZ-CD-ALL drop zones at all, regardless of sortation category
+                                // Only highlight if: not DZ-CD-ALL dropzone AND multiple categories AND not all categories are DZ-CD-ALL
+                                const isDZAll = dz.dropZoneId === 'DZ-CD-ALL';
+                                const hasMultipleCategories = !isDZAll && allCategories.length > 1 && !allCategories.every(cat => cat === 'DZ-CD-ALL');
+                                const rowHighlight = hasMultipleCategories ? 'background: #ffe6e6 !important; border-left: 3px solid #dc3545;' : '';
+                                
                                 return `
-                                <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 ? 'background: #f8f9fa;' : ''}">
-                                    <td style="padding: 10px 8px; font-weight: 500; color: ${categoryColor};">${dz.dropZoneId}</td>
+                                <tr style="border-bottom: 1px solid #dee2e6; ${index % 2 === 0 && !hasMultipleCategories ? 'background: #f8f9fa;' : ''} ${rowHighlight}">
+                                    <td style="padding: 10px 8px; font-weight: 500; color: ${categoryColor}; overflow: hidden; text-overflow: ellipsis;">${dz.dropZoneId}</td>
                                     <td style="padding: 10px 8px; text-align: center;">
                                         <span style="color: ${statusColor}; font-weight: 500;">${dz.status}</span>
                                     </td>
                                     <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalPallets}</td>
                                     <td style="padding: 10px 8px; text-align: center; color: #495057;">${dz.totalUnits}</td>
-                                    <td style="padding: 10px 8px; color: #6c757d; font-size: 12px;" title="${dz.sortationCategory}">
-                                        ${dz.sortationCategory && dz.sortationCategory.length > 20 ? dz.sortationCategory.substring(0, 20) + '...' : dz.sortationCategory || 'N/A'}
+                                    <td style="padding: 10px 8px; color: #6c757d; font-size: 12px; word-wrap: break-word; overflow-wrap: break-word;" title="${sortationDisplay}">
+                                        ${hasMultipleCategories ? `<strong style="color: #dc3545;">${sortationDisplay}</strong>` : sortationDisplay}
                                     </td>
-                                    <td style="padding: 10px 8px; text-align: center; color: #6c757d; font-size: 12px;">${dz.lastUpdated}</td>
+                                    <td style="padding: 10px 8px; text-align: center; color: #6c757d; font-size: 12px; overflow: hidden; text-overflow: ellipsis;">${dz.lastUpdated}</td>
                                 </tr>
                                 `;
                             }).join('')}
