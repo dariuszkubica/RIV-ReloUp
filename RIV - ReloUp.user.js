@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.1
+// @version      3.2
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -46,12 +46,15 @@
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
     
-    // Check for updates on startup
-    setTimeout(checkForUpdates, 5000);
-    
     // Auto-update functionality
     async function checkForUpdates() {
         try {
+            // Check if Greasemonkey/Tampermonkey API is available
+            if (typeof GM_getValue === 'undefined' || typeof GM_xmlhttpRequest === 'undefined') {
+                console.log('🔄 Update check skipped - Greasemonkey API not available');
+                return;
+            }
+            
             // Only check once per day
             const lastCheck = GM_getValue('lastUpdateCheck', 0);
             const now = Date.now();
@@ -82,8 +85,10 @@
                             }
                         }
                         
-                        // Save last check time
-                        GM_setValue('lastUpdateCheck', now);
+                        // Save last check time (if GM_setValue is available)
+                        if (typeof GM_setValue !== 'undefined') {
+                            GM_setValue('lastUpdateCheck', now);
+                        }
                     }
                 },
                 onerror: function() {
@@ -298,6 +303,9 @@
     
     // Store collected data for CSV export
     let collectedContainerData = [];
+    
+    // Processing state for search analysis
+    let isProcessing = false;
     
     // CSV Export functionality
     function collectContainerData(data, parentInfo = null) {
@@ -3401,7 +3409,7 @@
     
     // Fast parallel processing
     async function processChildContainersFast(childContainers, warehouseId, associate) {
-        console.log(`🎯 Starting FAST analysis of ${childContainers.length} containers`);
+        console.log(`🎯 Starting FAST analysis of ${childContainers.length} containers with warehouseId: ${warehouseId}, associate: ${associate}`);
         
         updateTotalItemsDisplay(null, `Starting analysis...`);
         
@@ -3493,9 +3501,17 @@
     
     // Process response data
     function processApiResponse(data, requestBody) {
+        console.log('📊 processApiResponse called with:', {
+            hasData: !!data,
+            hasChildContainers: data?.childContainers?.length,
+            isProcessing: isProcessing,
+            containerId: requestBody?.containerId
+        });
+        
         if (data && data.childContainers && Array.isArray(data.childContainers) && data.childContainers.length > 0) {
             if (!isProcessing) {
                 isProcessing = true;
+                console.log(`🚀 Starting analysis for ${data.childContainers.length} containers`);
                 
                 const warehouseId = requestBody.warehouseId;
                 const associate = requestBody.associate;
@@ -3511,11 +3527,16 @@
                         console.error('❌ Error during analysis:', error);
                     } finally {
                         isProcessing = false;
+                        console.log('✅ Analysis completed, isProcessing reset');
                     }
                 }, 100); // Much shorter delay
                 
                 return true;
+            } else {
+                console.log('⚠️ Already processing, skipping');
             }
+        } else {
+            console.log('❌ No valid data or child containers found');
         }
         return false;
     }
@@ -3561,12 +3582,13 @@
                         const responseData = JSON.parse(xhr.responseText);
                         const requestData = JSON.parse(data);
                         
-                        // Only process main search requests
-                        if (!isProcessing || requestData.containerId.includes('DZ-')) {
+                        // Process all search requests for container analysis
+                        if (!isProcessing && requestData.containerId) {
+                            console.log(`🔍 Processing search response for: ${requestData.containerId}`);
                             processApiResponse(responseData, requestData);
                         }
                     } catch (e) {
-                        // Silent fail for speed
+                        console.warn('❌ Error processing API response:', e.message);
                     }
                 }
                 
