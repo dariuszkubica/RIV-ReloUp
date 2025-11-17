@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.9
+// @version      2.9.1
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
-// @description  Enhanced warehouse analysis with auto session loading, location tracking, and real-time updates
+// @description  Enhanced warehouse analysis with smart session monitoring, location tracking, and real-time updates
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
 // @grant        none
 // @run-at       document-start
@@ -536,10 +536,25 @@
             align-items: center;
             gap: 6px;
             cursor: pointer;
+            max-width: 250px;
         `;
         sessionStatus.id = 'riv-session-status';
-        sessionStatus.onclick = () => autoLoadSessionData();
-        sessionStatus.title = 'Click to refresh session data';
+        sessionStatus.onclick = () => {
+            // Show session details on click
+            const details = `
+Session Data Debug:
+• Warehouse: ${sessionData.warehouseId || 'Not set'}
+• Associate: ${sessionData.associate || 'Not set'}  
+• Last Captured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}
+• Valid: ${(sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' && sessionData.associate && sessionData.associate !== 'System') ? 'Yes' : 'No'}
+
+Click OK to refresh session data.`;
+            
+            if (confirm(details)) {
+                autoLoadSessionData();
+            }
+        };
+        sessionStatus.title = 'Session data status - Click for details and refresh';
         
         // Add to body instead of footer for better visibility
         document.body.appendChild(sessionStatus);
@@ -1933,18 +1948,149 @@
         try {
             console.log('🔄 Auto-loading session data...');
             
-            // Create a silent search that won't show UI errors
+            // First try to intercept real network requests
+            await interceptSessionData();
+            
+            // Then try the DZ search method
             const silentSearch = await performContainerSearch('DZ', true); // true = silent mode
             
-            console.log('✅ Session data auto-loaded successfully');
-            updateSessionStatus('success', 'Session data ready');
+            // Check if we got valid session data
+            const isValidSession = sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' &&
+                                   sessionData.associate && sessionData.associate !== 'System';
+            
+            if (isValidSession) {
+                console.log('✅ Session data auto-loaded successfully:', {
+                    warehouseId: sessionData.warehouseId,
+                    associate: sessionData.associate
+                });
+                updateSessionStatus('success', `Session ready (${sessionData.warehouseId})`);
+                sessionData.lastCaptured = new Date();
+            } else {
+                console.log('📡 Session data partially captured, using fallback');
+                updateSessionStatus('success', 'Session data ready (fallback)');
+            }
+            
             return true;
         } catch (error) {
-            // Expected to fail, but session data should be captured
+            // Expected to fail for DZ, but session data should be captured
             console.log('📡 Session data captured from auto-search (expected DZ error)');
             updateSessionStatus('success', 'Session data ready');
             return true;
         }
+    }
+    
+    // Intercept session data from real network requests
+    async function interceptSessionData() {
+        return new Promise((resolve) => {
+            // Override XMLHttpRequest to capture session data
+            const originalOpen = XMLHttpRequest.prototype.open;
+            const originalSend = XMLHttpRequest.prototype.send;
+            
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                this._rivUrl = url;
+                this._rivMethod = method;
+                return originalOpen.call(this, method, url, ...args);
+            };
+            
+            XMLHttpRequest.prototype.send = function(data) {
+                if (this._rivUrl && this._rivUrl.includes('/api/getContainer') && data) {
+                    try {
+                        const requestData = JSON.parse(data);
+                        if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
+                            sessionData.warehouseId = requestData.warehouseId;
+                            console.log('🎯 Captured warehouseId from real request:', requestData.warehouseId);
+                        }
+                        if (requestData.associate && requestData.associate !== 'System') {
+                            sessionData.associate = requestData.associate;
+                            console.log('🎯 Captured associate from real request:', requestData.associate);
+                        }
+                        sessionData.lastCaptured = new Date();
+                    } catch (e) {
+                        console.warn('Failed to parse request data:', e);
+                    }
+                }
+                return originalSend.call(this, data);
+            };
+            
+            // Restore original methods after short delay
+            setTimeout(() => {
+                XMLHttpRequest.prototype.open = originalOpen;
+                XMLHttpRequest.prototype.send = originalSend;
+                resolve();
+            }, 5000);
+        });
+    }
+    
+    // Start monitoring session data from real application requests
+    function startSessionMonitoring() {
+        console.log('🔍 Starting session data monitoring...');
+        
+        // Override fetch to capture session data
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const [url, options] = args;
+            
+            if (url && url.includes('/api/getContainer') && options && options.body) {
+                try {
+                    const requestData = JSON.parse(options.body);
+                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
+                        sessionData.warehouseId = requestData.warehouseId;
+                        console.log('🎯 [Fetch] Captured warehouseId:', requestData.warehouseId);
+                    }
+                    if (requestData.associate && requestData.associate !== 'System') {
+                        sessionData.associate = requestData.associate;
+                        console.log('🎯 [Fetch] Captured associate:', requestData.associate);
+                    }
+                    sessionData.lastCaptured = new Date();
+                    
+                    // Update status indicator
+                    if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
+                        updateSessionStatus('success', `Session active (${sessionData.warehouseId})`);
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+            
+            return originalFetch.apply(this, args);
+        };
+        
+        // Also monitor XMLHttpRequest
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+        
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            this._rivUrl = url;
+            this._rivMethod = method;
+            return originalOpen.call(this, method, url, ...args);
+        };
+        
+        XMLHttpRequest.prototype.send = function(data) {
+            if (this._rivUrl && this._rivUrl.includes('/api/getContainer') && data) {
+                try {
+                    const requestData = JSON.parse(data);
+                    if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
+                        sessionData.warehouseId = requestData.warehouseId;
+                        console.log('🎯 [XHR] Captured warehouseId:', requestData.warehouseId);
+                    }
+                    if (requestData.associate && requestData.associate !== 'System') {
+                        sessionData.associate = requestData.associate;
+                        console.log('🎯 [XHR] Captured associate:', requestData.associate);
+                    }
+                    sessionData.lastCaptured = new Date();
+                    
+                    // Update status indicator
+                    if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
+                        updateSessionStatus('success', `Session active (${sessionData.warehouseId})`);
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+            return originalSend.call(this, data);
+        };
+        
+        console.log('✅ Session monitoring active - will capture data from app requests');
     }
     
     // Periodic session data refresh
@@ -3405,6 +3551,10 @@
         
         // Auto-load session data in background
         setTimeout(() => {
+            // First start monitoring for real requests
+            startSessionMonitoring();
+            
+            // Then try auto-loading
             autoLoadSessionData().then(() => {
                 // Start periodic refresh after initial load
                 startSessionRefresh();
