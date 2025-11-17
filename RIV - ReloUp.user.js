@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.4
+// @version      2.5
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -18,7 +18,7 @@
 (function() {
     'use strict';
     
-    const SCRIPT_VERSION = '2.4';
+    const SCRIPT_VERSION = '2.5';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.user.js';
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
@@ -543,6 +543,17 @@
         footer.appendChild(dashboardItem);
         footer.appendChild(palletlandItem);
         footer.appendChild(settingsItem);
+        
+        // Apply visibility settings
+        updateMenuVisibility();
+    }
+
+    // Update menu visibility based on settings
+    function updateMenuVisibility() {
+        const palletlandMenuItem = document.querySelector('[data-riv-menu-item="palletland"]');
+        if (palletlandMenuItem) {
+            palletlandMenuItem.style.display = scriptSettings.showPalletLand ? 'block' : 'none';
+        }
     }
 
     // Settings modal functionality
@@ -581,6 +592,19 @@
                 <button id="close-settings" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
             </div>
             
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #555; margin-bottom: 10px;">🎨 Interface Settings</h3>
+                
+                <label style="display: block; margin-bottom: 10px;">
+                    <input type="checkbox" id="show-palletland" style="margin-right: 10px;">
+                    Show PalletLand option in footer menu
+                </label>
+                
+                <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460; margin-bottom: 15px;">
+                    <strong>Note:</strong> Uncheck to hide PalletLand from the footer menu if you only need Dashboard functionality.
+                </div>
+            </div>
+
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #555; margin-bottom: 10px;">📦 PalletLand Configuration</h3>
                 
@@ -766,6 +790,22 @@
         overlay.onclick = (e) => {
             if (e.target === overlay) overlay.remove();
         };
+    }
+
+    // Update menu visibility based on settings
+    function updateMenuVisibility() {
+        const palletlandMenuItem = document.querySelector('[data-riv-menu-item="palletland"]');
+        if (palletlandMenuItem) {
+            palletlandMenuItem.style.display = scriptSettings.showPalletLand ? 'block' : 'none';
+        }
+    }
+    
+    // Update menu visibility based on settings
+    function updateMenuVisibility() {
+        const palletlandMenuItem = document.querySelector('[data-riv-menu-item="palletland"]');
+        if (palletlandMenuItem) {
+            palletlandMenuItem.style.display = scriptSettings.showPalletLand ? 'block' : 'none';
+        }
     }
 
     // Dashboard functionality
@@ -2230,8 +2270,9 @@
         `;
     }
 
-    // Settings storage
+    // Settings storage - preserved across updates via localStorage
     let scriptSettings = {
+        showPalletLand: true, // Show PalletLand option in menu
         batchSize: 5,
         showCopyTooltip: true,
         highlightCopiedCell: true,
@@ -2436,6 +2477,7 @@
         // Get values from modal
         const filenamePrefixInput = document.getElementById('filename-prefix');
         const includeTimestampInput = document.getElementById('include-timestamp');
+        const showPalletLandInput = document.getElementById('show-palletland');
         
         // PalletLand settings
         const customDestInput = document.getElementById('custom-destinations');
@@ -2445,6 +2487,7 @@
 
         scriptSettings.filenamePrefix = filenamePrefixInput?.value || 'RIV';
         scriptSettings.includeTimestamp = includeTimestampInput?.checked || false;
+        scriptSettings.showPalletLand = showPalletLandInput?.checked !== false; // Default true
         
         // PalletLand settings
         scriptSettings.palletlandCustomDestinations = customDestInput?.value || '';
@@ -2457,6 +2500,9 @@
         try {
             localStorage.setItem('riv-reloup-settings', JSON.stringify(scriptSettings));
             console.log('Settings saved successfully');
+            
+            // Refresh menu visibility
+            updateMenuVisibility();
         } catch (e) {
             console.warn('Could not save settings:', e);
         }
