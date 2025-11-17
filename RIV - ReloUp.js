@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.2
+// @version      2.3
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -18,7 +18,7 @@
 (function() {
     'use strict';
     
-    const SCRIPT_VERSION = '2.2';
+    const SCRIPT_VERSION = '2.3';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
@@ -1931,21 +1931,11 @@
         const totalPalletsAll = dashboardData.reduce((sum, dz) => sum + dz.totalPallets, 0);
         const totalUnitsAll = dashboardData.reduce((sum, dz) => sum + dz.totalUnits, 0);
         
-        // Group by category (A, B, C, D) and sortation category
-        const categoryStats = {};
+        // Group by sortation category only
         const sortationStats = {};
         
         dashboardData.forEach(dz => {
-            const category = dz.dropZoneId.match(/DZ-CDPL-([ABCD])/)?.[1] || 'Unknown';
-            if (!categoryStats[category]) {
-                categoryStats[category] = { total: 0, active: 0, empty: 0, error: 0, pallets: 0, units: 0 };
-            }
-            categoryStats[category].total++;
             if (dz.status === 'Active') {
-                categoryStats[category].active++;
-                categoryStats[category].pallets += dz.totalPallets;
-                categoryStats[category].units += dz.totalUnits;
-                
                 // Count sortation categories - handle multiple categories separated by commas
                 const sortCat = dz.sortationCategory;
                 if (sortCat && sortCat !== 'N/A' && sortCat !== 'Empty') {
@@ -1963,10 +1953,6 @@
                         sortationStats[category].units += Math.round(dz.totalUnits * contribution);
                     });
                 }
-            } else if (dz.status === 'Empty') {
-                categoryStats[category].empty++;
-            } else if (dz.status === 'Error') {
-                categoryStats[category].error++;
             }
         });
         
@@ -1999,18 +1985,6 @@
                     </div>
                 </div>
                 
-                <!-- Category Breakdown -->
-                <h4 style="margin: 20px 0 15px 0; color: #555;">📂 By Category:</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                    ${Object.keys(categoryStats).sort().map(category => `
-                        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${category === 'A' ? '#28a745' : category === 'B' ? '#17a2b8' : category === 'C' ? '#ffc107' : '#dc3545'};">
-                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px;">Category ${category}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Active: <strong>${categoryStats[category].active}</strong> / ${categoryStats[category].total}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${categoryStats[category].pallets}</strong></div>
-                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${categoryStats[category].units}</strong></div>
-                        </div>
-                    `).join('')}
-                </div>
             </div>
             
             <!-- Sortation Categories -->
