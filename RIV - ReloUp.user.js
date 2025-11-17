@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.9.2
+// @version      2.9.3
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -18,7 +18,30 @@
 (function() {
     'use strict';
     
-    const SCRIPT_VERSION = '2.8';
+    // Auto-extract version from script metadata
+    const SCRIPT_VERSION = (() => {
+        const scriptElement = document.querySelector('script[src*="ReloUp"]') || 
+                             Array.from(document.scripts).find(s => s.textContent.includes('@version'));
+        if (scriptElement && scriptElement.textContent) {
+            const versionMatch = scriptElement.textContent.match(/@version\s+([\d.]+)/);
+            if (versionMatch) return versionMatch[1];
+        }
+        
+        // Fallback: try to extract from current script source
+        try {
+            const currentScript = document.currentScript || 
+                                 document.querySelector('script[data-userscript-name*="ReloUp"]');
+            if (currentScript && currentScript.textContent) {
+                const match = currentScript.textContent.match(/@version\s+([\d.]+)/);
+                if (match) return match[1];
+            }
+        } catch (e) {}
+        
+        // Final fallback: extract from this very text
+        const thisScript = `// @version      2.9.3`;
+        const fallbackMatch = thisScript.match(/@version\s+([\d.]+)/);
+        return fallbackMatch ? fallbackMatch[1] : '2.9.3';
+    })();
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.user.js';
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
@@ -1955,6 +1978,12 @@ Click OK to refresh session data.`;
             const hasValidSession = sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' &&
                                    sessionData.associate && sessionData.associate !== 'System';
             
+            console.log('📊 Session data after page extraction:', {
+                warehouseId: sessionData.warehouseId,
+                associate: sessionData.associate,
+                isValid: hasValidSession
+            });
+            
             if (!hasValidSession) {
                 console.log('🔍 No valid session found, triggering API call...');
                 
@@ -1962,7 +1991,15 @@ Click OK to refresh session data.`;
                 await triggerRealAPICall();
                 
                 // Wait a bit for the request to be intercepted
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('⏳ Waiting for API response to be intercepted...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Check if monitoring captured anything
+                console.log('📊 Session data after API trigger:', {
+                    warehouseId: sessionData.warehouseId,
+                    associate: sessionData.associate,
+                    lastCaptured: sessionData.lastCaptured
+                });
             }
             
             // Check again if we got valid session data
@@ -2056,22 +2093,28 @@ Click OK to refresh session data.`;
         try {
             console.log('🎯 Attempting to trigger real API call...');
             
-            // Strategy 1: Look for main search input
-            let searchInput = document.querySelector('input[data-testid*="search"], input[placeholder*="search" i], input[placeholder*="container" i]');
+            // Strategy 1: Look for the specific Amazon search input
+            let searchInput = document.querySelector('input[id^="input-:r"], input[aria-label="Scan LPN or Container"]');
             
-            // Strategy 2: Look for any text input that might be a search field
+            // Strategy 2: Look for input in barcode-scan container
             if (!searchInput) {
-                const inputs = document.querySelectorAll('input[type="text"]');
-                for (const input of inputs) {
-                    const label = input.labels?.[0]?.textContent || input.placeholder || input.getAttribute('aria-label') || '';
-                    if (label.toLowerCase().includes('search') || label.toLowerCase().includes('container') || label.toLowerCase().includes('scan')) {
-                        searchInput = input;
-                        break;
-                    }
+                const barcodeContainer = document.querySelector('.barcode-scan, div[class*="barcode"]');
+                if (barcodeContainer) {
+                    searchInput = barcodeContainer.querySelector('input[type="text"]');
                 }
             }
             
-            // Strategy 3: Look for any visible text input
+            // Strategy 3: Look for main search input by placeholder
+            if (!searchInput) {
+                searchInput = document.querySelector('input[placeholder*="LPNxxx"], input[placeholder*="tsxxx"]');
+            }
+            
+            // Strategy 4: Look for any search-related input
+            if (!searchInput) {
+                searchInput = document.querySelector('input[placeholder*="search" i], input[aria-label*="search" i]');
+            }
+            
+            // Strategy 5: Look for any visible text input
             if (!searchInput) {
                 const inputs = document.querySelectorAll('input[type="text"]');
                 searchInput = Array.from(inputs).find(input => {
@@ -2084,9 +2127,9 @@ Click OK to refresh session data.`;
             
             if (searchInput) {
                 console.log('🎯 Found search input:', {
-                    placeholder: searchInput.placeholder,
                     id: searchInput.id,
-                    name: searchInput.name
+                    placeholder: searchInput.placeholder,
+                    ariaLabel: searchInput.getAttribute('aria-label')
                 });
                 
                 // Store original state
@@ -2094,59 +2137,64 @@ Click OK to refresh session data.`;
                 const wasDisabled = searchInput.disabled;
                 const wasFocused = document.activeElement === searchInput;
                 
-                // Enable if disabled
+                // Enable if disabled and focus
                 if (wasDisabled) searchInput.disabled = false;
-                
-                // Focus and enter search term
                 searchInput.focus();
+                
+                // Clear and set DZ value with realistic timing
                 searchInput.value = '';
-                searchInput.value = 'DZ';
+                await new Promise(resolve => setTimeout(resolve, 100));
                 
-                // Dispatch events to simulate user input
+                // Type 'DZ' character by character to trigger all events
                 searchInput.dispatchEvent(new Event('focus', { bubbles: true }));
-                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
                 
-                // Look for submit button
-                let submitButton = null;
-                
-                // Strategy 1: Find button with search-related attributes
-                submitButton = document.querySelector('button[type="submit"], button[data-testid*="search"], button[aria-label*="search" i]');
-                
-                // Strategy 2: Find button near the input
-                if (!submitButton) {
-                    const inputParent = searchInput.closest('form, div');
-                    if (inputParent) {
-                        submitButton = inputParent.querySelector('button');
-                    }
+                for (let char of 'DZ') {
+                    searchInput.value += char;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
                 
-                // Strategy 3: Find any visible button that might be submit
+                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // Wait a bit for React/Vue to update button state
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // Find the search button - it should be enabled now
+                let submitButton = null;
+                
+                // Strategy 1: Look for button near the input
+                const inputContainer = searchInput.closest('.barcode-scan, div[class*="scan"], form, div');
+                if (inputContainer) {
+                    submitButton = inputContainer.querySelector('button:not([disabled]), button[type="button"]:not([disabled])');
+                }
+                
+                // Strategy 2: Look for any search button
                 if (!submitButton) {
-                    const buttons = document.querySelectorAll('button');
+                    submitButton = document.querySelector('button:not([disabled])[class*="search"], button:not([disabled]) span:contains("Search")');
+                }
+                
+                // Strategy 3: Find any enabled button that might be submit
+                if (!submitButton) {
+                    const buttons = document.querySelectorAll('button:not([disabled])');
                     submitButton = Array.from(buttons).find(btn => {
                         const text = btn.textContent?.toLowerCase() || '';
-                        const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
-                        return (text.includes('search') || text.includes('find') || text.includes('go') || 
-                               ariaLabel.includes('search') || ariaLabel.includes('submit')) &&
-                               window.getComputedStyle(btn).display !== 'none';
+                        const spans = btn.querySelectorAll('span');
+                        const hasSearchText = text.includes('search') || 
+                                            Array.from(spans).some(span => span.textContent?.toLowerCase().includes('search'));
+                        return hasSearchText && window.getComputedStyle(btn).display !== 'none';
                     });
                 }
                 
-                console.log('🎯 Search strategy:', submitButton ? 'Button found' : 'Using Enter key');
+                console.log('🎯 Search button found:', !!submitButton, submitButton?.textContent?.trim());
                 
-                if (submitButton) {
+                if (submitButton && !submitButton.disabled) {
                     // Click the submit button
+                    console.log('🚀 Clicking search button...');
                     submitButton.click();
                 } else {
-                    // Try Enter key
+                    // Try Enter key as fallback
+                    console.log('🎹 Using Enter key fallback...');
                     searchInput.dispatchEvent(new KeyboardEvent('keydown', { 
-                        key: 'Enter', 
-                        code: 'Enter',
-                        bubbles: true,
-                        cancelable: true
-                    }));
-                    searchInput.dispatchEvent(new KeyboardEvent('keypress', { 
                         key: 'Enter', 
                         code: 'Enter',
                         bubbles: true,
@@ -2157,14 +2205,17 @@ Click OK to refresh session data.`;
                 // Restore original state after API call completes
                 setTimeout(() => {
                     try {
-                        searchInput.value = originalValue;
-                        searchInput.disabled = wasDisabled;
-                        if (!wasFocused) searchInput.blur();
-                        searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (searchInput && searchInput.isConnected) {
+                            searchInput.value = originalValue;
+                            searchInput.disabled = wasDisabled;
+                            if (!wasFocused) searchInput.blur();
+                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                     } catch (e) {
-                        // Input might be removed from DOM
+                        console.log('Note: Could not restore input state (element might be removed)');
                     }
-                }, 3000);
+                }, 4000);
                 
             } else {
                 console.log('🔍 No search input found, trying direct API call...');
