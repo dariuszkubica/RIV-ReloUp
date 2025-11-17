@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.9.3
+// @version      3.0
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -541,49 +541,6 @@
         if (footer.querySelector('[data-riv-menu-item]')) {
             return;
         }
-
-        // Session Status Indicator
-        const sessionStatus = document.createElement('div');
-        sessionStatus.setAttribute('data-riv-menu-item', 'session-status');
-        sessionStatus.style.cssText = `
-            position: fixed; 
-            top: 10px; 
-            right: 10px; 
-            background: rgba(0,0,0,0.8); 
-            color: white; 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            font-size: 12px; 
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            max-width: 250px;
-        `;
-        sessionStatus.id = 'riv-session-status';
-        sessionStatus.onclick = () => {
-            // Show session details on click
-            const details = `
-Session Data Debug:
-• Warehouse: ${sessionData.warehouseId || 'Not set'}
-• Associate: ${sessionData.associate || 'Not set'}  
-• Last Captured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}
-• Valid: ${(sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' && sessionData.associate && sessionData.associate !== 'System') ? 'Yes' : 'No'}
-
-Click OK to refresh session data.`;
-            
-            if (confirm(details)) {
-                autoLoadSessionData();
-            }
-        };
-        sessionStatus.title = 'Session data status - Click for details and refresh';
-        
-        // Add to body instead of footer for better visibility
-        document.body.appendChild(sessionStatus);
-        
-        // Update session status display
-        updateSessionStatus('loading', 'Loading session...');
 
         // Dashboard menu item
         const dashboardItem = document.createElement('a');
@@ -1966,8 +1923,6 @@ Click OK to refresh session data.`;
     
     // Automatically load session data by searching for 'DZ' in background
     async function autoLoadSessionData() {
-        updateSessionStatus('loading', 'Loading session data...');
-        
         try {
             console.log('🔄 Auto-loading session data...');
             
@@ -1985,21 +1940,8 @@ Click OK to refresh session data.`;
             });
             
             if (!hasValidSession) {
-                console.log('🔍 No valid session found, triggering API call...');
-                
-                // Try to find any input field or search that we can trigger
-                await triggerRealAPICall();
-                
-                // Wait a bit for the request to be intercepted
-                console.log('⏳ Waiting for API response to be intercepted...');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Check if monitoring captured anything
-                console.log('📊 Session data after API trigger:', {
-                    warehouseId: sessionData.warehouseId,
-                    associate: sessionData.associate,
-                    lastCaptured: sessionData.lastCaptured
-                });
+                console.log('🔍 No valid session found - monitoring mode active');
+                console.log('📊 Use normal search to capture session data automatically');
             }
             
             // Check again if we got valid session data
@@ -2011,17 +1953,14 @@ Click OK to refresh session data.`;
                     warehouseId: sessionData.warehouseId,
                     associate: sessionData.associate
                 });
-                updateSessionStatus('success', `Session ready (${sessionData.warehouseId})`);
                 sessionData.lastCaptured = new Date();
             } else {
                 console.log('⚠️ Using fallback session data');
-                updateSessionStatus('idle', 'Session fallback (use search first)');
             }
             
             return true;
         } catch (error) {
             console.log('❌ Error in auto-loading:', error);
-            updateSessionStatus('error', 'Session load failed');
             return false;
         }
     }
@@ -2088,152 +2027,7 @@ Click OK to refresh session data.`;
         }
     }
     
-    // Trigger a real API call to capture session data
-    async function triggerRealAPICall() {
-        try {
-            console.log('🎯 Attempting to trigger real API call...');
-            
-            // Strategy 1: Look for the specific Amazon search input
-            let searchInput = document.querySelector('input[id^="input-:r"], input[aria-label="Scan LPN or Container"]');
-            
-            // Strategy 2: Look for input in barcode-scan container
-            if (!searchInput) {
-                const barcodeContainer = document.querySelector('.barcode-scan, div[class*="barcode"]');
-                if (barcodeContainer) {
-                    searchInput = barcodeContainer.querySelector('input[type="text"]');
-                }
-            }
-            
-            // Strategy 3: Look for main search input by placeholder
-            if (!searchInput) {
-                searchInput = document.querySelector('input[placeholder*="LPNxxx"], input[placeholder*="tsxxx"]');
-            }
-            
-            // Strategy 4: Look for any search-related input
-            if (!searchInput) {
-                searchInput = document.querySelector('input[placeholder*="search" i], input[aria-label*="search" i]');
-            }
-            
-            // Strategy 5: Look for any visible text input
-            if (!searchInput) {
-                const inputs = document.querySelectorAll('input[type="text"]');
-                searchInput = Array.from(inputs).find(input => {
-                    const rect = input.getBoundingClientRect();
-                    return rect.width > 0 && rect.height > 0 && 
-                           window.getComputedStyle(input).display !== 'none' &&
-                           window.getComputedStyle(input).visibility !== 'hidden';
-                });
-            }
-            
-            if (searchInput) {
-                console.log('🎯 Found search input:', {
-                    id: searchInput.id,
-                    placeholder: searchInput.placeholder,
-                    ariaLabel: searchInput.getAttribute('aria-label')
-                });
-                
-                // Store original state
-                const originalValue = searchInput.value;
-                const wasDisabled = searchInput.disabled;
-                const wasFocused = document.activeElement === searchInput;
-                
-                // Enable if disabled and focus
-                if (wasDisabled) searchInput.disabled = false;
-                searchInput.focus();
-                
-                // Clear and set DZ value with realistic timing
-                searchInput.value = '';
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-                // Type 'DZ' character by character to trigger all events
-                searchInput.dispatchEvent(new Event('focus', { bubbles: true }));
-                
-                for (let char of 'DZ') {
-                    searchInput.value += char;
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-                
-                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                
-                // Wait a bit for React/Vue to update button state
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-                // Find the search button - it should be enabled now
-                let submitButton = null;
-                
-                // Strategy 1: Look for button near the input
-                const inputContainer = searchInput.closest('.barcode-scan, div[class*="scan"], form, div');
-                if (inputContainer) {
-                    submitButton = inputContainer.querySelector('button:not([disabled]), button[type="button"]:not([disabled])');
-                }
-                
-                // Strategy 2: Look for any search button
-                if (!submitButton) {
-                    submitButton = document.querySelector('button:not([disabled])[class*="search"], button:not([disabled]) span:contains("Search")');
-                }
-                
-                // Strategy 3: Find any enabled button that might be submit
-                if (!submitButton) {
-                    const buttons = document.querySelectorAll('button:not([disabled])');
-                    submitButton = Array.from(buttons).find(btn => {
-                        const text = btn.textContent?.toLowerCase() || '';
-                        const spans = btn.querySelectorAll('span');
-                        const hasSearchText = text.includes('search') || 
-                                            Array.from(spans).some(span => span.textContent?.toLowerCase().includes('search'));
-                        return hasSearchText && window.getComputedStyle(btn).display !== 'none';
-                    });
-                }
-                
-                console.log('🎯 Search button found:', !!submitButton, submitButton?.textContent?.trim());
-                
-                if (submitButton && !submitButton.disabled) {
-                    // Click the submit button
-                    console.log('🚀 Clicking search button...');
-                    submitButton.click();
-                } else {
-                    // Try Enter key as fallback
-                    console.log('🎹 Using Enter key fallback...');
-                    searchInput.dispatchEvent(new KeyboardEvent('keydown', { 
-                        key: 'Enter', 
-                        code: 'Enter',
-                        bubbles: true,
-                        cancelable: true
-                    }));
-                }
-                
-                // Restore original state after API call completes
-                setTimeout(() => {
-                    try {
-                        if (searchInput && searchInput.isConnected) {
-                            searchInput.value = originalValue;
-                            searchInput.disabled = wasDisabled;
-                            if (!wasFocused) searchInput.blur();
-                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                    } catch (e) {
-                        console.log('Note: Could not restore input state (element might be removed)');
-                    }
-                }, 4000);
-                
-            } else {
-                console.log('🔍 No search input found, trying direct API call...');
-                // Fallback: direct API call with monitoring active
-                await performContainerSearch('DZ', true);
-            }
-            
-        } catch (e) {
-            console.warn('Error triggering API call:', e);
-            // Final fallback
-            try {
-                await performContainerSearch('DZ', true);
-            } catch (fallbackError) {
-                console.warn('Fallback API call also failed:', fallbackError);
-            }
-        }
-    }
-    
+
     // Start monitoring session data from real application requests
     function startSessionMonitoring() {
         console.log('🔍 Starting session data monitoring...');
@@ -2256,9 +2050,9 @@ Click OK to refresh session data.`;
                     }
                     sessionData.lastCaptured = new Date();
                     
-                    // Update status indicator
+                    // Log session data capture
                     if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
-                        updateSessionStatus('success', `Session active (${sessionData.warehouseId})`);
+                        console.log('✅ Session data active');
                     }
                 } catch (e) {
                     // Ignore parsing errors
@@ -2292,9 +2086,9 @@ Click OK to refresh session data.`;
                     }
                     sessionData.lastCaptured = new Date();
                     
-                    // Update status indicator
+                    // Log session data capture
                     if (sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1') {
-                        updateSessionStatus('success', `Session active (${sessionData.warehouseId})`);
+                        console.log('✅ Session data active');
                     }
                 } catch (e) {
                     // Ignore parsing errors
@@ -2325,38 +2119,6 @@ Click OK to refresh session data.`;
             sessionRefreshInterval = null;
             console.log('⏹️ Session data refresh stopped');
         }
-    }
-    
-    // Update session status indicator
-    function updateSessionStatus(status, message) {
-        const statusElement = document.getElementById('riv-session-status');
-        if (!statusElement) return;
-        
-        let color, icon;
-        switch(status) {
-            case 'loading':
-                color = '#ffc107';
-                icon = '🔄';
-                break;
-            case 'success':
-                color = '#28a745';
-                icon = '✅';
-                break;
-            case 'error':
-                color = '#dc3545';
-                icon = '❌';
-                break;
-            case 'idle':
-                color = '#6c757d';
-                icon = '💤';
-                break;
-            default:
-                color = '#6c757d';
-                icon = '❓';
-        }
-        
-        statusElement.style.background = `rgba(${status === 'success' ? '40,167,69' : status === 'error' ? '220,53,69' : status === 'loading' ? '255,193,7' : '108,117,125'}, 0.9)`;
-        statusElement.innerHTML = `${icon} ${message}`;
     }
     
     // Enhanced container search with silent mode option
