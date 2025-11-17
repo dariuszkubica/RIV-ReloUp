@@ -1,20 +1,18 @@
 // ==UserScript==
 // @name         RIV - ReloUp
-// @namespace    https://github.com/dariuszkubica/RIV-ReloUp
+// @namespace    KTW1
 // @version      2.1
-// @description  Enhanced Drop Zone Analysis with Dashboard and PalletLand
-// @author       kubicdar
-// @match        https://*.amazon.com/*
-// @match        https://*.amazon.pl/*
-// @grant        GM_xmlhttpRequest
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_notification
-// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
-// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
-// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
+// @author       Dariusz Kubica (kubicdar)
+// @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
+// @license      Licensed with the consent of the author
+// @description  Fast deep container analysis with PalletLand monitoring
+// @match        https://dub.prod.item-visibility.returns.amazon.dev/*
+// @grant        none
+// @run-at       document-start
 // @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
-// @run-at       document-end
+// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
+// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
+// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
 // ==/UserScript==
 
 (function() {
