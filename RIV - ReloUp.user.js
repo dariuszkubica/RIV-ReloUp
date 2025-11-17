@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.9.1
+// @version      2.9.2
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -1948,17 +1948,28 @@ Click OK to refresh session data.`;
         try {
             console.log('🔄 Auto-loading session data...');
             
-            // First try to intercept real network requests
-            await interceptSessionData();
+            // Strategy 1: Try to extract from current page
+            await extractSessionFromPage();
             
-            // Then try the DZ search method
-            const silentSearch = await performContainerSearch('DZ', true); // true = silent mode
-            
-            // Check if we got valid session data
-            const isValidSession = sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' &&
+            // Strategy 2: If no valid data, trigger a real API call to capture session
+            const hasValidSession = sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' &&
                                    sessionData.associate && sessionData.associate !== 'System';
             
-            if (isValidSession) {
+            if (!hasValidSession) {
+                console.log('🔍 No valid session found, triggering API call...');
+                
+                // Try to find any input field or search that we can trigger
+                await triggerRealAPICall();
+                
+                // Wait a bit for the request to be intercepted
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Check again if we got valid session data
+            const finalCheck = sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' &&
+                              sessionData.associate && sessionData.associate !== 'System';
+            
+            if (finalCheck) {
                 console.log('✅ Session data auto-loaded successfully:', {
                     warehouseId: sessionData.warehouseId,
                     associate: sessionData.associate
@@ -1966,59 +1977,210 @@ Click OK to refresh session data.`;
                 updateSessionStatus('success', `Session ready (${sessionData.warehouseId})`);
                 sessionData.lastCaptured = new Date();
             } else {
-                console.log('📡 Session data partially captured, using fallback');
-                updateSessionStatus('success', 'Session data ready (fallback)');
+                console.log('⚠️ Using fallback session data');
+                updateSessionStatus('idle', 'Session fallback (use search first)');
             }
             
             return true;
         } catch (error) {
-            // Expected to fail for DZ, but session data should be captured
-            console.log('📡 Session data captured from auto-search (expected DZ error)');
-            updateSessionStatus('success', 'Session data ready');
-            return true;
+            console.log('❌ Error in auto-loading:', error);
+            updateSessionStatus('error', 'Session load failed');
+            return false;
         }
     }
     
-    // Intercept session data from real network requests
-    async function interceptSessionData() {
-        return new Promise((resolve) => {
-            // Override XMLHttpRequest to capture session data
-            const originalOpen = XMLHttpRequest.prototype.open;
-            const originalSend = XMLHttpRequest.prototype.send;
-            
-            XMLHttpRequest.prototype.open = function(method, url, ...args) {
-                this._rivUrl = url;
-                this._rivMethod = method;
-                return originalOpen.call(this, method, url, ...args);
-            };
-            
-            XMLHttpRequest.prototype.send = function(data) {
-                if (this._rivUrl && this._rivUrl.includes('/api/getContainer') && data) {
-                    try {
-                        const requestData = JSON.parse(data);
-                        if (requestData.warehouseId && requestData.warehouseId !== 'CDPL1') {
-                            sessionData.warehouseId = requestData.warehouseId;
-                            console.log('🎯 Captured warehouseId from real request:', requestData.warehouseId);
+    // Extract session data from page elements
+    async function extractSessionFromPage() {
+        try {
+            // Method 1: Check localStorage
+            const storageKeys = Object.keys(localStorage);
+            for (const key of storageKeys) {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value && (value.includes('warehouse') || value.includes('associate') || value.includes('user'))) {
+                        const data = JSON.parse(value);
+                        if (data.warehouseId && data.warehouseId !== 'CDPL1') {
+                            sessionData.warehouseId = data.warehouseId;
+                            console.log('🎯 Found warehouseId in localStorage:', data.warehouseId);
                         }
-                        if (requestData.associate && requestData.associate !== 'System') {
-                            sessionData.associate = requestData.associate;
-                            console.log('🎯 Captured associate from real request:', requestData.associate);
+                        if (data.associate && data.associate !== 'System') {
+                            sessionData.associate = data.associate;
+                            console.log('🎯 Found associate in localStorage:', data.associate);
                         }
-                        sessionData.lastCaptured = new Date();
-                    } catch (e) {
-                        console.warn('Failed to parse request data:', e);
+                        if (data.username && data.username !== 'System') {
+                            sessionData.associate = data.username;
+                            console.log('🎯 Found username in localStorage:', data.username);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore JSON parse errors
+                }
+            }
+            
+            // Method 2: Check window objects
+            if (window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig) {
+                const state = window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig;
+                if (state.user) {
+                    if (state.user.warehouseId) sessionData.warehouseId = state.user.warehouseId;
+                    if (state.user.associate) sessionData.associate = state.user.associate;
+                    if (state.user.username) sessionData.associate = state.user.username;
+                }
+            }
+            
+            // Method 3: Check page scripts for embedded data
+            const scripts = document.querySelectorAll('script:not([src])');
+            for (const script of scripts) {
+                const text = script.textContent;
+                if (text && text.includes('warehouseId')) {
+                    const warehouseMatch = text.match(/"warehouseId":\s*"([A-Z0-9]{3,10})"/);
+                    const associateMatch = text.match(/"(?:associate|username)":\s*"([A-Z0-9]{3,20})"/);
+                    
+                    if (warehouseMatch && warehouseMatch[1] !== 'CDPL1') {
+                        sessionData.warehouseId = warehouseMatch[1];
+                        console.log('🎯 Found warehouseId in script:', warehouseMatch[1]);
+                    }
+                    if (associateMatch && associateMatch[1] !== 'System') {
+                        sessionData.associate = associateMatch[1];
+                        console.log('🎯 Found associate in script:', associateMatch[1]);
                     }
                 }
-                return originalSend.call(this, data);
-            };
+            }
             
-            // Restore original methods after short delay
-            setTimeout(() => {
-                XMLHttpRequest.prototype.open = originalOpen;
-                XMLHttpRequest.prototype.send = originalSend;
-                resolve();
-            }, 5000);
-        });
+        } catch (e) {
+            console.warn('Error extracting session from page:', e);
+        }
+    }
+    
+    // Trigger a real API call to capture session data
+    async function triggerRealAPICall() {
+        try {
+            console.log('🎯 Attempting to trigger real API call...');
+            
+            // Strategy 1: Look for main search input
+            let searchInput = document.querySelector('input[data-testid*="search"], input[placeholder*="search" i], input[placeholder*="container" i]');
+            
+            // Strategy 2: Look for any text input that might be a search field
+            if (!searchInput) {
+                const inputs = document.querySelectorAll('input[type="text"]');
+                for (const input of inputs) {
+                    const label = input.labels?.[0]?.textContent || input.placeholder || input.getAttribute('aria-label') || '';
+                    if (label.toLowerCase().includes('search') || label.toLowerCase().includes('container') || label.toLowerCase().includes('scan')) {
+                        searchInput = input;
+                        break;
+                    }
+                }
+            }
+            
+            // Strategy 3: Look for any visible text input
+            if (!searchInput) {
+                const inputs = document.querySelectorAll('input[type="text"]');
+                searchInput = Array.from(inputs).find(input => {
+                    const rect = input.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0 && 
+                           window.getComputedStyle(input).display !== 'none' &&
+                           window.getComputedStyle(input).visibility !== 'hidden';
+                });
+            }
+            
+            if (searchInput) {
+                console.log('🎯 Found search input:', {
+                    placeholder: searchInput.placeholder,
+                    id: searchInput.id,
+                    name: searchInput.name
+                });
+                
+                // Store original state
+                const originalValue = searchInput.value;
+                const wasDisabled = searchInput.disabled;
+                const wasFocused = document.activeElement === searchInput;
+                
+                // Enable if disabled
+                if (wasDisabled) searchInput.disabled = false;
+                
+                // Focus and enter search term
+                searchInput.focus();
+                searchInput.value = '';
+                searchInput.value = 'DZ';
+                
+                // Dispatch events to simulate user input
+                searchInput.dispatchEvent(new Event('focus', { bubbles: true }));
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // Look for submit button
+                let submitButton = null;
+                
+                // Strategy 1: Find button with search-related attributes
+                submitButton = document.querySelector('button[type="submit"], button[data-testid*="search"], button[aria-label*="search" i]');
+                
+                // Strategy 2: Find button near the input
+                if (!submitButton) {
+                    const inputParent = searchInput.closest('form, div');
+                    if (inputParent) {
+                        submitButton = inputParent.querySelector('button');
+                    }
+                }
+                
+                // Strategy 3: Find any visible button that might be submit
+                if (!submitButton) {
+                    const buttons = document.querySelectorAll('button');
+                    submitButton = Array.from(buttons).find(btn => {
+                        const text = btn.textContent?.toLowerCase() || '';
+                        const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+                        return (text.includes('search') || text.includes('find') || text.includes('go') || 
+                               ariaLabel.includes('search') || ariaLabel.includes('submit')) &&
+                               window.getComputedStyle(btn).display !== 'none';
+                    });
+                }
+                
+                console.log('🎯 Search strategy:', submitButton ? 'Button found' : 'Using Enter key');
+                
+                if (submitButton) {
+                    // Click the submit button
+                    submitButton.click();
+                } else {
+                    // Try Enter key
+                    searchInput.dispatchEvent(new KeyboardEvent('keydown', { 
+                        key: 'Enter', 
+                        code: 'Enter',
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                    searchInput.dispatchEvent(new KeyboardEvent('keypress', { 
+                        key: 'Enter', 
+                        code: 'Enter',
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                }
+                
+                // Restore original state after API call completes
+                setTimeout(() => {
+                    try {
+                        searchInput.value = originalValue;
+                        searchInput.disabled = wasDisabled;
+                        if (!wasFocused) searchInput.blur();
+                        searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    } catch (e) {
+                        // Input might be removed from DOM
+                    }
+                }, 3000);
+                
+            } else {
+                console.log('🔍 No search input found, trying direct API call...');
+                // Fallback: direct API call with monitoring active
+                await performContainerSearch('DZ', true);
+            }
+            
+        } catch (e) {
+            console.warn('Error triggering API call:', e);
+            // Final fallback
+            try {
+                await performContainerSearch('DZ', true);
+            } catch (fallbackError) {
+                console.warn('Fallback API call also failed:', fallbackError);
+            }
+        }
     }
     
     // Start monitoring session data from real application requests
@@ -3554,12 +3716,20 @@ Click OK to refresh session data.`;
             // First start monitoring for real requests
             startSessionMonitoring();
             
-            // Then try auto-loading
-            autoLoadSessionData().then(() => {
-                // Start periodic refresh after initial load
-                startSessionRefresh();
+            // Then try auto-loading with more aggressive strategy
+            autoLoadSessionData().then((success) => {
+                if (success) {
+                    // Start periodic refresh after initial load
+                    startSessionRefresh();
+                } else {
+                    // If auto-loading failed, try again in 10 seconds
+                    setTimeout(() => {
+                        console.log('🔄 Retrying session data load...');
+                        autoLoadSessionData();
+                    }, 10000);
+                }
             });
-        }, 2000); // Load session data after 2 seconds
+        }, 3000); // Wait longer for page to be fully loaded
         
         // Check for updates (delayed to not interfere with main functionality)
         setTimeout(() => {
