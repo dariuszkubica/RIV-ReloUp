@@ -1917,7 +1917,7 @@
         dashboardSegments: [
             { prefix: 'DZ-CD', from: 1, to: 26, enabled: true }
         ],
-        dashboardCustomDestinations: 'DZ-CDALL'
+        dashboardCustomDestinations: 'DZ-CD-ALL'
     };
 
     // PalletLand segment management functions (global for onclick access)
