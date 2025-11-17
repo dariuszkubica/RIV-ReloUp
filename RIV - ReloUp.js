@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.1
+// @version      2.2
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -18,7 +18,7 @@
 (function() {
     'use strict';
     
-    const SCRIPT_VERSION = '2.1';
+    const SCRIPT_VERSION = '2.2';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
@@ -642,22 +642,34 @@
             </div>
 
             <div style="margin-bottom: 20px;">
-                <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> ${SCRIPT_VERSION}</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Author:</strong> kubicdar</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality, Auto-update</p>
-                <p style="margin: 5px 0; color: #666;">
-                    <strong>Repository:</strong> 
-                    <a href="https://github.com/dariuszkubica/RIV-ReloUp/blob/main/RIV%20-%20ReloUp.js" 
-                       target="_blank" style="color: #007bff; text-decoration: none;">
-                        GitHub Repository
-                    </a>
-                </p>
-                <button id="manual-update-check" style="
-                    background: #007bff; color: white; border: none; padding: 8px 16px; 
-                    border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 10px;
-                ">🔄 Check for Updates</button>
-                <div id="update-info" style="margin-top: 10px;"></div>
+                <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info & Updates</h3>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <p style="margin: 0; color: #666;"><strong>Version:</strong> ${SCRIPT_VERSION}</p>
+                        <p style="margin: 0; color: #666;"><strong>Author:</strong> kubicdar</p>
+                    </div>
+                    <p style="margin: 5px 0 0 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality, Auto-update</p>
+                    <p style="margin: 5px 0 0 0; color: #666;">
+                        <strong>Repository:</strong> 
+                        <a href="https://github.com/dariuszkubica/RIV-ReloUp" 
+                           target="_blank" style="color: #007bff; text-decoration: none;">
+                            GitHub Repository
+                        </a>
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <button id="manual-update-check" style="
+                        background: #007bff; color: white; border: none; padding: 8px 16px; 
+                        border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.3s ease;
+                    ">🔄 Check for Updates</button>
+                    <button id="visit-repo" style="
+                        background: #28a745; color: white; border: none; padding: 8px 16px; 
+                        border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.3s ease;
+                    ">📂 Visit Repository</button>
+                </div>
+                <div id="update-info" style="min-height: 20px;"></div>
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
@@ -675,42 +687,72 @@
         // Manual update check button
         document.getElementById('manual-update-check').onclick = () => {
             const updateInfo = document.getElementById('update-info');
-            updateInfo.innerHTML = '<span style="color: #007bff;">🔄 Checking for updates...</span>';
+            const checkButton = document.getElementById('manual-update-check');
             
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: GITHUB_RAW_URL,
-                onload: function(response) {
-                    if (response.status === 200) {
-                        const versionMatch = response.responseText.match(/@version\s+([\d.]+)/);
-                        if (versionMatch) {
-                            const remoteVersion = versionMatch[1];
-                            if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
-                                updateInfo.innerHTML = `
-                                    <div style="color: #28a745; font-weight: bold;">🚀 Update Available!</div>
-                                    <div style="font-size: 12px; margin-top: 5px;">
-                                        Version ${remoteVersion} is ready. 
-                                        <a href="${GITHUB_RAW_URL}" target="_blank" style="color: #007bff;">Download now</a>
-                                    </div>
-                                `;
-                            } else {
-                                updateInfo.innerHTML = '<span style="color: #28a745;">✅ Script is up to date!</span>';
-                            }
+            // Disable button and show loading state
+            checkButton.disabled = true;
+            checkButton.innerHTML = '🔄 Checking...';
+            updateInfo.innerHTML = '<div style="color: #007bff; padding: 10px; background: #e3f2fd; border-radius: 4px;">🔄 Checking for updates...</div>';
+            
+            // Use fetch instead of GM_xmlhttpRequest since @grant is none
+            fetch(GITHUB_RAW_URL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(responseText => {
+                    const versionMatch = responseText.match(/@version\s+([\d.]+)/);
+                    if (versionMatch) {
+                        const remoteVersion = versionMatch[1];
+                        if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
+                            updateInfo.innerHTML = `
+                                <div style="color: #28a745; background: #d4edda; padding: 15px; border-radius: 4px; border: 1px solid #c3e6cb;">
+                                    <div style="font-weight: bold; margin-bottom: 8px;">🚀 Update Available!</div>
+                                    <div style="font-size: 13px; margin-bottom: 8px;">Version ${remoteVersion} is ready.</div>
+                                    <a href="${GITHUB_RAW_URL}" target="_blank" 
+                                       style="display: inline-block; background: #28a745; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-size: 13px;">
+                                        📥 Download Update
+                                    </a>
+                                </div>
+                            `;
                         } else {
-                            updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Could not parse version info</span>';
+                            updateInfo.innerHTML = `
+                                <div style="color: #28a745; background: #d4edda; padding: 15px; border-radius: 4px; border: 1px solid #c3e6cb;">
+                                    <div style="font-weight: bold;">✅ Script is up to date!</div>
+                                    <div style="font-size: 12px; margin-top: 5px; color: #155724;">Current version: ${SCRIPT_VERSION}</div>
+                                </div>
+                            `;
                         }
                     } else {
-                        updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Failed to check for updates</span>';
+                        updateInfo.innerHTML = '<div style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 4px; border: 1px solid #f5c6cb;">❌ Could not parse version information</div>';
                     }
-                },
-                onerror: function() {
-                    updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Network error while checking updates</span>';
-                }
-            });
+                })
+                .catch(error => {
+                    console.error('Update check failed:', error);
+                    updateInfo.innerHTML = `
+                        <div style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 4px; border: 1px solid #f5c6cb;">
+                            ❌ Failed to check for updates<br>
+                            <small style="font-size: 11px; margin-top: 8px; display: block;">Due to CORS restrictions, automatic update checking may not work.</small>
+                            <a href="https://github.com/dariuszkubica/RIV-ReloUp" target="_blank" 
+                               style="display: inline-block; margin-top: 8px; background: #007bff; color: white; padding: 6px 12px; text-decoration: none; border-radius: 3px; font-size: 11px;">
+                                📋 Check on GitHub
+                            </a>
+                        </div>
+                    `;
+                })
+                .finally(() => {
+                    // Re-enable button
+                    checkButton.disabled = false;
+                    checkButton.innerHTML = '🔄 Check for Updates';
+                });
         };
         
-        // Check for updates and show status
-        checkUpdateStatus();
+        // Visit repository button
+        document.getElementById('visit-repo').onclick = () => {
+            window.open('https://github.com/dariuszkubica/RIV-ReloUp', '_blank');
+        };
         
         // Event listeners
         document.getElementById('close-settings').onclick = () => overlay.remove();
@@ -905,20 +947,25 @@
                 z-index: 1000000;
                 max-width: 300px;
             `;
+            
+            const hasValidSession = sessionData.warehouseId && sessionData.associate && 
+                                  sessionData.warehouseId !== 'CDPL1' && sessionData.associate !== 'System';
+            
             debugInfo.innerHTML = `
                 <strong>🔧 Session Debug Info:</strong><br>
                 warehouseId: ${sessionData.warehouseId || 'Not captured'}<br>
                 associate: ${sessionData.associate || 'Not captured'}<br>
-                lastCaptured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}
+                lastCaptured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}<br>
+                <strong style="color: ${hasValidSession ? '#28a745' : '#dc3545'};">Status: ${hasValidSession ? 'Valid ✅' : 'Invalid ❌'}</strong>
             `;
             overlay.appendChild(debugInfo);
             
-            // Auto-remove after 10 seconds
+            // Auto-remove after 15 seconds for session info
             setTimeout(() => {
                 if (debugInfo.parentNode) {
                     debugInfo.remove();
                 }
-            }, 10000);
+            }, 15000);
         }, 1000);
         
         // Auto-start scan when dashboard opens
@@ -1179,12 +1226,60 @@
         const refreshBtn = document.getElementById('refresh-dashboard');
         const exportBtn = document.getElementById('export-dashboard');
         
+        // Check session data first
+        if (!sessionData.warehouseId || !sessionData.associate || 
+            sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
+            
+            // Show session data error without starting scan
+            const dashboardContent = document.getElementById('dashboard-content');
+            if (dashboardContent) {
+                dashboardContent.innerHTML = `
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        padding: 40px;
+                        text-align: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        border: 2px solid #ffc107;
+                    ">
+                        <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                        <h3 style="color: #856404; margin-bottom: 15px; font-weight: 600;">Brak danych sesji</h3>
+                        <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
+                            Aby Dashboard mógł działać poprawnie, należy najpierw:
+                        </p>
+                        <div style="
+                            background: #fff3cd;
+                            border: 1px solid #ffeaa7;
+                            border-radius: 8px;
+                            padding: 20px;
+                            margin: 20px 0;
+                            text-align: left;
+                        ">
+                            <h4 style="color: #856404; margin: 0 0 10px 0;">🔍 Instrukcja:</h4>
+                            <ol style="color: #856404; margin: 0; padding-left: 20px;">
+                                <li>Wróć do głównej strony RIV</li>
+                                <li>Wyszukaj dowolną Drop Zone z towarem</li>
+                                <li>Poczekaj na załadowanie wyników</li>
+                                <li>Wróć do Dashboard i spróbuj ponownie</li>
+                            </ol>
+                        </div>
+                        <p style="color: #6c757d; font-size: 13px; margin-top: 15px;">
+                            Dashboard potrzebuje aktywnych danych sesji aby wykonywać zapytania do systemu.
+                        </p>
+                    </div>
+                `;
+            }
+            
+            console.log('❌ Dashboard scan aborted - invalid session data');
+            return;
+        }
+        
         // Show progress and disable buttons
         progressDiv.style.display = 'block';
         refreshBtn.disabled = true;
         exportBtn.disabled = true;
         
-        // Wait for valid session data or try to get it
+        // Continue with existing session data logic
         if (!sessionData.warehouseId || !sessionData.associate || 
             sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
             
@@ -1381,12 +1476,70 @@
         const refreshBtn = document.getElementById('refresh-palletland');
         const exportBtn = document.getElementById('export-palletland');
         
+        // Check session data first
+        if (!sessionData.warehouseId || !sessionData.associate || 
+            sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
+            
+            // Show session data error without starting scan
+            const palletlandContent = document.getElementById('palletland-content');
+            if (palletlandContent) {
+                palletlandContent.innerHTML = `
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        padding: 40px;
+                        text-align: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        border: 2px solid #6f42c1;
+                    ">
+                        <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                        <h3 style="color: #5a31a1; margin-bottom: 15px; font-weight: 600;">Brak danych sesji</h3>
+                        <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
+                            Aby PalletLand mógł działać poprawnie, należy najpierw:
+                        </p>
+                        <div style="
+                            background: #f8f4ff;
+                            border: 1px solid #d4b9ff;
+                            border-radius: 8px;
+                            padding: 20px;
+                            margin: 20px 0;
+                            text-align: left;
+                        ">
+                            <h4 style="color: #5a31a1; margin: 0 0 10px 0;">🔍 Instrukcja:</h4>
+                            <ol style="color: #5a31a1; margin: 0; padding-left: 20px;">
+                                <li>Wróć do głównej strony RIV</li>
+                                <li>Wyszukaj dowolną Drop Zone z towarem</li>
+                                <li>Poczekaj na załadowanie wyników</li>
+                                <li>Wróć do PalletLand i spróbuj ponownie</li>
+                            </ol>
+                        </div>
+                        <p style="color: #6c757d; font-size: 13px; margin-top: 15px;">
+                            PalletLand potrzebuje aktywnych danych sesji aby wykonywać zapytania do systemu.
+                        </p>
+                        <button onclick="window.location.reload()" style="
+                            background: #6f42c1;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            margin-top: 15px;
+                            font-size: 14px;
+                        ">🔄 Odśwież stronę</button>
+                    </div>
+                `;
+            }
+            
+            console.log('❌ PalletLand scan aborted - invalid session data');
+            return;
+        }
+        
         // Show progress and disable buttons
         progressDiv.style.display = 'block';
         refreshBtn.disabled = true;
         exportBtn.disabled = true;
         
-        // Wait for valid session data or try to get it
+        // Continue with existing session data logic
         if (!sessionData.warehouseId || !sessionData.associate || 
             sessionData.warehouseId === 'CDPL1' || sessionData.associate === 'System') {
             
@@ -2304,58 +2457,7 @@
         loadSegments();
         loadDashboardSegments();
     }
-    
-    async function checkUpdateStatus() {
-        const updateInfo = document.getElementById('update-info');
-        if (!updateInfo) return;
-        
-        updateInfo.innerHTML = '<span style="color: #666; font-size: 12px;">Checking for updates...</span>';
-        
-        try {
-            const response = await fetch(GITHUB_RAW_URL);
-            if (!response.ok) throw new Error('Failed to fetch');
-            
-            const scriptContent = await response.text();
-            const versionMatch = scriptContent.match(/@version\s+([\d\.]+)/);
-            
-            if (versionMatch) {
-                const remoteVersion = versionMatch[1];
-                if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
-                    updateInfo.innerHTML = `
-                        <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; border-radius: 4px; margin-top: 10px;">
-                            <span style="color: #856404; font-size: 12px;">📢 Update available: v${remoteVersion}</span>
-                            <button id="settings-update-now" data-version="${remoteVersion}" 
-                                    style="margin-left: 10px; background: #ffc107; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">Update Now</button>
-                        </div>
-                    `;
-                    
-                    // Add event listener for the update button
-                    setTimeout(() => {
-                        const updateBtn = document.getElementById('settings-update-now');
-                        if (updateBtn) {
-                            updateBtn.onclick = async () => {
-                                try {
-                                    const response = await fetch(GITHUB_RAW_URL);
-                                    const scriptContent = await response.text();
-                                    const version = updateBtn.getAttribute('data-version');
-                                    performUpdate(scriptContent, version);
-                                } catch (error) {
-                                    alert('Failed to fetch update: ' + error.message);
-                                }
-                            };
-                        }
-                    }, 100);
-                } else {
-                    updateInfo.innerHTML = '<span style="color: #28a745; font-size: 12px;">✅ Up to date</span>';
-                }
-            } else {
-                updateInfo.innerHTML = '<span style="color: #dc3545; font-size: 12px;">❌ Cannot check version</span>';
-            }
-        } catch (error) {
-            updateInfo.innerHTML = '<span style="color: #6c757d; font-size: 12px;">⚠️ Update check failed</span>';
-        }
-    }
-
+    // Settings management functions
     function saveSettings() {
         // Get values from modal
         const filenamePrefixInput = document.getElementById('filename-prefix');
