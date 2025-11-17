@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.2
+// @version      3.3
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -1194,28 +1194,28 @@
                 </header>
 
                 <!-- PalletLand Content -->
-                <main style="max-width: 1400px; margin: 0 auto; padding: 30px;">
+                <main style="max-width: 1400px; margin: 0 auto; padding: 20px;">
                     <!-- Control Panel -->
-                    <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+                        <div style="display: flex; gap: 12px; margin-bottom: 15px; flex-wrap: wrap;">
                             <button id="refresh-palletland" style="
                                 background: #6f42c1;
                                 color: white;
                                 border: none;
-                                padding: 12px 24px;
+                                padding: 10px 20px;
                                 border-radius: 6px;
                                 cursor: pointer;
                                 font-size: 14px;
                                 font-weight: 500;
                                 transition: all 0.3s ease;
                                 box-shadow: 0 2px 4px rgba(111,66,193,0.3);
-                            " onmouseover="this.style.background='#5a31a1'" onmouseout="this.style.background='#6f42c1'">🔄 Deep Scan</button>
+                            " onmouseover="this.style.background='#5a31a1'" onmouseout="this.style.background='#6f42c1'">🔄 Refresh</button>
                             
                             <button id="export-palletland" disabled style="
                                 background: #6c757d;
                                 color: white;
                                 border: none;
-                                padding: 12px 24px;
+                                padding: 10px 20px;
                                 border-radius: 6px;
                                 cursor: pointer;
                                 font-size: 14px;
@@ -1228,7 +1228,7 @@
                                 margin-left: auto;
                                 display: flex;
                                 align-items: center;
-                                gap: 20px;
+                                gap: 15px;
                                 font-size: 13px;
                                 color: #666;
                             ">
@@ -1237,12 +1237,12 @@
                             </div>
                         </div>
                         
-                        <div id="palletland-scan-progress" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div id="palletland-scan-progress" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <span id="palletland-progress-text" style="font-weight: 500; color: #495057;">Scanning Drop Zones...</span>
                                 <span id="palletland-progress-percentage" style="color: #6c757d; font-size: 14px;">0%</span>
                             </div>
-                            <div style="background: #dee2e6; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: #dee2e6; height: 6px; border-radius: 3px; overflow: hidden;">
                                 <div id="palletland-progress-bar" style="background: linear-gradient(90deg, #6f42c1, #764ba2); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
                             </div>
                         </div>
@@ -1252,14 +1252,14 @@
                     <div id="palletland-content">
                         <div style="
                             text-align: center;
-                            padding: 80px 20px;
+                            padding: 50px 20px;
                             background: white;
-                            border-radius: 12px;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            border-radius: 8px;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
                         ">
-                            <div style="font-size: 48px; margin-bottom: 20px; opacity: 0.3;">🎯</div>
-                            <h3 style="color: #495057; margin-bottom: 10px; font-weight: 500;">Loading PalletLand Data...</h3>
-                            <p style="color: #6c757d; margin-bottom: 30px;">Ready for Deep Scan Analysis</p>
+                            <div style="font-size: 40px; margin-bottom: 15px; opacity: 0.3;">🎯</div>
+                            <h3 style="color: #495057; margin-bottom: 8px; font-weight: 500;">Loading Palletland Data...</h3>
+                            <p style="color: #6c757d; margin-bottom: 20px;">Ready for Analysis</p>
                         </div>
                     </div>
                 </main>
@@ -2572,6 +2572,8 @@
         const totalPalletsAll = palletlandData.reduce((sum, dz) => sum + (dz.palletCount || 0), 0);
         const totalUnitsAll = palletlandData.reduce((sum, dz) => sum + (dz.unitCount || 0), 0);
         
+        console.log(`🎯 PalletLand Stats: ${totalPalletsAll} pallets, ${totalUnitsAll} units from ${palletlandData.length} zones`);
+        
         // Group by category (A, B, C, D) and sortation category
         const categoryStats = {};
         const sortationStats = {};
@@ -2660,49 +2662,42 @@
         
         contentDiv.innerHTML = `
             <!-- Summary Statistics -->
-            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 Palletland Summary Statistics</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 25px;">
+            <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+                <h3 style="margin: 0 0 12px 0; color: #333; font-size: 18px;">🎯 Palletland Summary Statistics</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-bottom: 15px;">
                     <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #28a745;">${activeZones}</div>
-                        <div style="font-size: 14px; color: #666;">Active Zones</div>
+                        <div style="font-size: 22px; font-weight: bold; color: #28a745;">${activeZones}</div>
+                        <div style="font-size: 13px; color: #666;">Active Zones</div>
                     </div>
                     <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #6c757d;">${emptyZones}</div>
-                        <div style="font-size: 14px; color: #666;">Empty Zones</div>
+                        <div style="font-size: 22px; font-weight: bold; color: #6c757d;">${emptyZones}</div>
+                        <div style="font-size: 13px; color: #666;">Empty Zones</div>
                     </div>
                     ${errorZones > 0 ? `
                     <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #dc3545;">${errorZones}</div>
-                        <div style="font-size: 14px; color: #666;">Error Zones</div>
+                        <div style="font-size: 22px; font-weight: bold; color: #dc3545;">${errorZones}</div>
+                        <div style="font-size: 13px; color: #666;">Error Zones</div>
                     </div>
                     ` : ''}
                     <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #6f42c1;">${totalPalletsAll}</div>
-                        <div style="font-size: 14px; color: #666;">Total Pallets</div>
+                        <div style="font-size: 22px; font-weight: bold; color: #6f42c1;">${totalPalletsAll}</div>
+                        <div style="font-size: 13px; color: #666;">Total Pallets</div>
                     </div>
-                    ${dashboardData.some(dz => dz.totalUnits > 0) ? `
                     <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #764ba2;">${totalUnitsAll}</div>
-                        <div style="font-size: 14px; color: #666;">Total Units</div>
+                        <div style="font-size: 22px; font-weight: bold; color: #764ba2;">${totalUnitsAll}</div>
+                        <div style="font-size: 13px; color: #666;">Total Units</div>
                     </div>
-                    ` : `
-                    <div style="text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #999;">N/A</div>
-                        <div style="font-size: 14px; color: #666;">Units (surface scan)</div>
-                    </div>
-                    `}
                 </div>
                 
                 <!-- Category Breakdown -->
-                <h4 style="margin: 20px 0 15px 0; color: #555;">📂 By Category:</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <h4 style="margin: 15px 0 10px 0; color: #555; font-size: 16px;">📂 By Category:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
                     ${Object.keys(categoryStats).sort().map(category => `
-                        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${category === 'A' ? '#28a745' : category === 'B' ? '#17a2b8' : category === 'C' ? '#ffc107' : '#6f42c1'};">
-                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px;">Category ${category}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Active: <strong>${categoryStats[category].active}</strong> / ${categoryStats[category].total}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${categoryStats[category].pallets}</strong></div>
-                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${categoryStats[category].units}</strong></div>
+                        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid ${category === 'A' ? '#28a745' : category === 'B' ? '#17a2b8' : category === 'C' ? '#ffc107' : '#6f42c1'};">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 6px; font-size: 14px;">Category ${category}</div>
+                            <div style="font-size: 11px; color: #6c757d;">Active: <strong>${categoryStats[category].active}</strong> / ${categoryStats[category].total}</div>
+                            <div style="font-size: 11px; color: #6c757d;">Pallets: <strong>${categoryStats[category].pallets}</strong></div>
+                            <div style="font-size: 11px; color: #6c757d;">Units: <strong>${categoryStats[category].units}</strong></div>
                         </div>
                     `).join('')}
                 </div>
@@ -2780,15 +2775,15 @@
             
             <!-- Sortation Categories -->
             ${Object.keys(sortationStats).length > 0 ? `
-            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <h3 style="margin: 0 0 20px 0; color: #333;">🏷️ Sortation Categories</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+                <h3 style="margin: 0 0 12px 0; color: #333; font-size: 18px;">🏷️ Sortation Categories</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
                     ${Object.keys(sortationStats).sort().map(category => `
-                        <div style="padding: 15px; background: #f1f3f4; border-radius: 8px; border-left: 4px solid #6f42c1;">
-                            <div style="font-weight: bold; color: #495057; margin-bottom: 8px; font-size: 14px;">${category}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${Math.round(sortationStats[category].zones)}</strong></div>
-                            <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
-                            <div style="font-size: 12px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
+                        <div style="padding: 12px; background: #f1f3f4; border-radius: 6px; border-left: 3px solid #6f42c1;">
+                            <div style="font-weight: bold; color: #495057; margin-bottom: 6px; font-size: 13px;">${category}</div>
+                            <div style="font-size: 11px; color: #6c757d;">Zones: <strong>${Math.round(sortationStats[category].zones)}</strong></div>
+                            <div style="font-size: 11px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
+                            <div style="font-size: 11px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
                         </div>
                     `).join('')}
                 </div>
