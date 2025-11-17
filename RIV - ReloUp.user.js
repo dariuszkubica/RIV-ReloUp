@@ -580,7 +580,7 @@
                         </svg>
                     </span>
                 </span>
-                <p class="css-1fz4hyd" mdn-text="">PalletLand</p>
+                <p class="css-1fz4hyd" mdn-text="">Palletland</p>
             </div>
         `;
 
@@ -663,16 +663,16 @@
                 
                 <label style="display: block; margin-bottom: 10px;">
                     <input type="checkbox" id="show-palletland" style="margin-right: 10px;">
-                    Show PalletLand option in footer menu
+                    Show Palletland option in footer menu
                 </label>
                 
                 <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460; margin-bottom: 15px;">
-                    <strong>Note:</strong> Uncheck to hide PalletLand from the footer menu if you only need Dashboard functionality.
+                    <strong>Note:</strong> Uncheck to hide Palletland from the footer menu if you only need Dashboard functionality.
                 </div>
             </div>
 
             <div style="margin-bottom: 20px;">
-                <h3 style="color: #555; margin-bottom: 10px;">📦 PalletLand Configuration</h3>
+                <h3 style="color: #555; margin-bottom: 10px;">📦 Palletland Configuration</h3>
                 
                 <div style="margin-bottom: 15px;">
                     <div style="margin-bottom: 15px;">
@@ -715,7 +715,7 @@
                 </div>
                 
                 <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
-                    <strong>Dashboard vs PalletLand:</strong> Dashboard is for quick overview (fewer zones), PalletLand for comprehensive analysis (many zones)
+                    <strong>Dashboard vs Palletland:</strong> Dashboard is for quick overview (fewer zones), Palletland for comprehensive analysis (many zones)
                 </div>
             </div>
 
@@ -886,22 +886,6 @@
         overlay.onclick = (e) => {
             if (e.target === overlay) overlay.remove();
         };
-    }
-
-    // Update menu visibility based on settings
-    function updateMenuVisibility() {
-        const palletlandMenuItem = document.querySelector('[data-riv-menu-item="palletland"]');
-        if (palletlandMenuItem) {
-            palletlandMenuItem.style.display = scriptSettings.showPalletLand ? 'block' : 'none';
-        }
-    }
-    
-    // Update menu visibility based on settings
-    function updateMenuVisibility() {
-        const palletlandMenuItem = document.querySelector('[data-riv-menu-item="palletland"]');
-        if (palletlandMenuItem) {
-            palletlandMenuItem.style.display = scriptSettings.showPalletLand ? 'block' : 'none';
-        }
     }
 
     // Dashboard functionality
@@ -1166,7 +1150,7 @@
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
                         <div>
-                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">🎯 PalletLand (Full Analysis)</h1>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">🎯 Palletland (Full Analysis)</h1>
                             <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Comprehensive Drop Zone Analysis System</p>
                         </div>
                         <button id="close-palletland" style="
@@ -2553,6 +2537,7 @@
         // Group by category (A, B, C, D) and sortation category
         const categoryStats = {};
         const sortationStats = {};
+        const destinationStats = {};
         
         palletlandData.forEach(dz => {
             const category = dz.dropZoneId.match(/DZ-CDPL-([ABCD])/)?.[1] || 'Unknown';
@@ -2577,9 +2562,55 @@
                         }
                         // For multiple categories in one zone, count fractional contribution
                         const contribution = 1 / categories.length;
+                        const palletContribution = Math.round((dz.palletCount || 0) * contribution);
+                        const unitContribution = Math.round((dz.unitCount || 0) * contribution);
+                        
                         sortationStats[category].zones += contribution;
-                        sortationStats[category].pallets += Math.round((dz.palletCount || 0) * contribution);
-                        sortationStats[category].units += Math.round((dz.unitCount || 0) * contribution);
+                        sortationStats[category].pallets += palletContribution;
+                        sortationStats[category].units += unitContribution;
+                        
+                        // Group by main destination
+                        const mainDestination = getMainDestination(category);
+                        if (!destinationStats[mainDestination]) {
+                            destinationStats[mainDestination] = { 
+                                zones: 0, 
+                                pallets: 0, 
+                                units: 0, 
+                                categories: new Set(),
+                                categoryDetails: {} // Track per-category stats
+                            };
+                        }
+                        
+                        // Add to category details
+                        if (!destinationStats[mainDestination].categoryDetails[category]) {
+                            destinationStats[mainDestination].categoryDetails[category] = {
+                                zones: 0,
+                                pallets: 0,
+                                units: 0,
+                                locations: {}
+                            };
+                        }
+                        
+                        // Track location details
+                        if (!destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId]) {
+                            destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId] = {
+                                pallets: 0,
+                                units: 0
+                            };
+                        }
+                        
+                        // Update main destination stats
+                        destinationStats[mainDestination].zones += contribution;
+                        destinationStats[mainDestination].pallets += palletContribution;
+                        destinationStats[mainDestination].units += unitContribution;
+                        destinationStats[mainDestination].categories.add(category);
+                        
+                        destinationStats[mainDestination].categoryDetails[category].zones += contribution;
+                        destinationStats[mainDestination].categoryDetails[category].pallets += palletContribution;
+                        destinationStats[mainDestination].categoryDetails[category].units += unitContribution;
+                        
+                        destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId].pallets += palletContribution;
+                        destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId].units += unitContribution;
                     });
                 }
             } else if (dz.status === 'Empty') {
@@ -2592,7 +2623,7 @@
         contentDiv.innerHTML = `
             <!-- Summary Statistics -->
             <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 PalletLand Summary Statistics</h3>
+                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 Palletland Summary Statistics</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 25px;">
                     <div style="text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #28a745;">${activeZones}</div>
@@ -2945,6 +2976,7 @@
         // Apply settings to modal
         const filenamePrefixInput = document.getElementById('filename-prefix');
         const includeTimestampInput = document.getElementById('include-timestamp');
+        const showPalletLandInput = document.getElementById('show-palletland');
         
         // PalletLand settings
         const customDestInput = document.getElementById('custom-destinations');
@@ -2954,6 +2986,7 @@
 
         if (filenamePrefixInput) filenamePrefixInput.value = scriptSettings.filenamePrefix;
         if (includeTimestampInput) includeTimestampInput.checked = scriptSettings.includeTimestamp;
+        if (showPalletLandInput) showPalletLandInput.checked = scriptSettings.showPalletLand;
         
         // PalletLand settings
         if (customDestInput) customDestInput.value = scriptSettings.palletlandCustomDestinations || '';
@@ -2980,7 +3013,7 @@
 
         scriptSettings.filenamePrefix = filenamePrefixInput?.value || 'RIV';
         scriptSettings.includeTimestamp = includeTimestampInput?.checked || false;
-        scriptSettings.showPalletLand = showPalletLandInput?.checked !== false; // Default true
+        scriptSettings.showPalletLand = showPalletLandInput?.checked ?? true; // Default true if undefined
         
         // PalletLand settings
         scriptSettings.palletlandCustomDestinations = customDestInput?.value || '';
