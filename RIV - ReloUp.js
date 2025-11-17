@@ -1,26 +1,160 @@
 // ==UserScript==
 // @name         RIV - ReloUp
-// @namespace    KTW1
+// @namespace    https://github.com/dariuszkubica/RIV-ReloUp
 // @version      2.1
-// @author       Dariusz Kubica (kubicdar)
-// @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
-// @license      Licensed with the consent of the author
-// @description  Fast deep container analysis with PalletLand monitoring
-// @match        https://dub.prod.item-visibility.returns.amazon.dev/*
-// @grant        none
-// @run-at       document-start
-// @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
-// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
-// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
+// @description  Enhanced Drop Zone Analysis with Dashboard and PalletLand
+// @author       kubicdar
+// @match        https://*.amazon.com/*
+// @match        https://*.amazon.pl/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_notification
 // @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
+// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js
+// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
+// @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
+// @run-at       document-end
 // ==/UserScript==
 
 (function() {
     'use strict';
     
+    const SCRIPT_VERSION = '2.1';
+    const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
+    
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
     
-    let isProcessing = false;
+    // Check for updates on startup
+    setTimeout(checkForUpdates, 5000);
+    
+    // Auto-update functionality
+    async function checkForUpdates() {
+        try {
+            // Only check once per day
+            const lastCheck = GM_getValue('lastUpdateCheck', 0);
+            const now = Date.now();
+            const oneDayMs = 24 * 60 * 60 * 1000;
+            
+            if (now - lastCheck < oneDayMs) {
+                console.log('🔄 Update check skipped - checked recently');
+                return;
+            }
+            
+            console.log('🔄 Checking for script updates...');
+            
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: GITHUB_RAW_URL,
+                onload: function(response) {
+                    if (response.status === 200) {
+                        // Extract version from remote script
+                        const versionMatch = response.responseText.match(/@version\s+([\d.]+)/);
+                        if (versionMatch) {
+                            const remoteVersion = versionMatch[1];
+                            console.log(`📋 Current version: ${SCRIPT_VERSION}, Remote version: ${remoteVersion}`);
+                            
+                            if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
+                                showUpdateNotification(remoteVersion);
+                            } else {
+                                console.log('✅ Script is up to date');
+                            }
+                        }
+                        
+                        // Save last check time
+                        GM_setValue('lastUpdateCheck', now);
+                    }
+                },
+                onerror: function() {
+                    console.warn('❌ Could not check for updates');
+                }
+            });
+        } catch (error) {
+            console.warn('❌ Update check failed:', error);
+        }
+    }
+    
+    function isNewerVersion(remote, current) {
+        const remoteParts = remote.split('.').map(Number);
+        const currentParts = current.split('.').map(Number);
+        
+        for (let i = 0; i < Math.max(remoteParts.length, currentParts.length); i++) {
+            const remoteNum = remoteParts[i] || 0;
+            const currentNum = currentParts[i] || 0;
+            
+            if (remoteNum > currentNum) return true;
+            if (remoteNum < currentNum) return false;
+        }
+        
+        return false;
+    }
+    
+    function showUpdateNotification(newVersion) {
+        // Show browser notification if supported
+        if (typeof GM_notification !== 'undefined') {
+            GM_notification({
+                title: '🚀 RIV - ReloUp Update Available',
+                text: `Version ${newVersion} is available. Click to update!`,
+                onclick: () => {
+                    window.open(GITHUB_RAW_URL, '_blank');
+                }
+            });
+        }
+        
+        // Also show in-page notification
+        setTimeout(() => {
+            const updateBanner = document.createElement('div');
+            updateBanner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #28a745, #20c997);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 0 0 10px 10px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 14px;
+                box-shadow: 0 4px 20px rgba(40, 167, 69, 0.3);
+                z-index: 1000000;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            `;
+            
+            updateBanner.innerHTML = `
+                <div style="text-align: center;">
+                    <strong>🚀 RIV - ReloUp Update Available!</strong><br>
+                    <small>Version ${newVersion} is ready - Click to download</small>
+                </div>
+            `;
+            
+            updateBanner.onclick = () => {
+                window.open(GITHUB_RAW_URL, '_blank');
+            };
+            
+            updateBanner.onmouseover = () => {
+                updateBanner.style.transform = 'translateX(-50%) translateY(5px)';
+            };
+            
+            updateBanner.onmouseout = () => {
+                updateBanner.style.transform = 'translateX(-50%) translateY(0)';
+            };
+            
+            document.body.appendChild(updateBanner);
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (updateBanner.parentNode) {
+                    updateBanner.style.opacity = '0';
+                    updateBanner.style.transform = 'translateX(-50%) translateY(-100%)';
+                    setTimeout(() => updateBanner.remove(), 300);
+                }
+            }, 10000);
+            
+        }, 3000);
+        
+        console.log(`🚀 Update available! Version ${newVersion} - Visit: ${GITHUB_RAW_URL}`);
+    }
     
     // Global session data storage
     let sessionData = {
@@ -511,9 +645,9 @@
 
             <div style="margin-bottom: 20px;">
                 <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> 1.3</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Version:</strong> ${SCRIPT_VERSION}</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Author:</strong> kubicdar</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Features:</strong> Fast analysis, CSV export, Copy functionality, Auto-update</p>
                 <p style="margin: 5px 0; color: #666;">
                     <strong>Repository:</strong> 
                     <a href="https://github.com/dariuszkubica/RIV-ReloUp/blob/main/RIV%20-%20ReloUp.js" 
@@ -521,6 +655,10 @@
                         GitHub Repository
                     </a>
                 </p>
+                <button id="manual-update-check" style="
+                    background: #007bff; color: white; border: none; padding: 8px 16px; 
+                    border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 10px;
+                ">🔄 Check for Updates</button>
                 <div id="update-info" style="margin-top: 10px;"></div>
             </div>
 
@@ -535,6 +673,43 @@
 
         // Load current settings
         loadSettings();
+        
+        // Manual update check button
+        document.getElementById('manual-update-check').onclick = () => {
+            const updateInfo = document.getElementById('update-info');
+            updateInfo.innerHTML = '<span style="color: #007bff;">🔄 Checking for updates...</span>';
+            
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: GITHUB_RAW_URL,
+                onload: function(response) {
+                    if (response.status === 200) {
+                        const versionMatch = response.responseText.match(/@version\s+([\d.]+)/);
+                        if (versionMatch) {
+                            const remoteVersion = versionMatch[1];
+                            if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
+                                updateInfo.innerHTML = `
+                                    <div style="color: #28a745; font-weight: bold;">🚀 Update Available!</div>
+                                    <div style="font-size: 12px; margin-top: 5px;">
+                                        Version ${remoteVersion} is ready. 
+                                        <a href="${GITHUB_RAW_URL}" target="_blank" style="color: #007bff;">Download now</a>
+                                    </div>
+                                `;
+                            } else {
+                                updateInfo.innerHTML = '<span style="color: #28a745;">✅ Script is up to date!</span>';
+                            }
+                        } else {
+                            updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Could not parse version info</span>';
+                        }
+                    } else {
+                        updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Failed to check for updates</span>';
+                    }
+                },
+                onerror: function() {
+                    updateInfo.innerHTML = '<span style="color: #dc3545;">❌ Network error while checking updates</span>';
+                }
+            });
+        };
         
         // Check for updates and show status
         checkUpdateStatus();
@@ -1082,16 +1257,24 @@
                         status = 'Active';
                         totalPallets = searchDetails.childContainers.length;
                         
-                        // Get sortation category from first pallet
-                        if (searchDetails.childContainers[0]) {
-                            const firstPallet = searchDetails.childContainers[0];
-                            // sortationCategories is an array, take first element
-                            if (firstPallet.sortationCategories && Array.isArray(firstPallet.sortationCategories) && firstPallet.sortationCategories.length > 0) {
-                                sortationCategory = firstPallet.sortationCategories[0];
-                            } else if (firstPallet.sortationCategory) {
-                                sortationCategory = firstPallet.sortationCategory;
+                        // Collect all unique sortation categories from all pallets
+                        const allCategories = new Set();
+                        
+                        for (const pallet of searchDetails.childContainers) {
+                            // Check for sortationCategories array
+                            if (pallet.sortationCategories && Array.isArray(pallet.sortationCategories)) {
+                                pallet.sortationCategories.forEach(cat => {
+                                    if (cat && cat !== 'N/A' && cat !== 'Empty') {
+                                        allCategories.add(cat);
+                                    }
+                                });
+                            } else if (pallet.sortationCategory && pallet.sortationCategory !== 'N/A' && pallet.sortationCategory !== 'Empty') {
+                                allCategories.add(pallet.sortationCategory);
                             }
                         }
+                        
+                        // Join all categories with separator
+                        sortationCategory = allCategories.size > 0 ? Array.from(allCategories).sort().join(', ') : 'N/A';
                         
                         // Deep scan: Get actual units from each pallet
                         progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
@@ -1275,15 +1458,24 @@
                         status = 'Active';
                         totalPallets = searchDetails.childContainers.length;
                         
-                        // Get sortation category from first pallet
-                        if (searchDetails.childContainers[0]) {
-                            const firstPallet = searchDetails.childContainers[0];
-                            if (firstPallet.sortationCategories && Array.isArray(firstPallet.sortationCategories) && firstPallet.sortationCategories.length > 0) {
-                                sortationCategory = firstPallet.sortationCategories[0];
-                            } else if (firstPallet.sortationCategory) {
-                                sortationCategory = firstPallet.sortationCategory;
+                        // Collect all unique sortation categories from all pallets
+                        const allCategories = new Set();
+                        
+                        for (const pallet of searchDetails.childContainers) {
+                            // Check for sortationCategories array
+                            if (pallet.sortationCategories && Array.isArray(pallet.sortationCategories)) {
+                                pallet.sortationCategories.forEach(cat => {
+                                    if (cat && cat !== 'N/A' && cat !== 'Empty') {
+                                        allCategories.add(cat);
+                                    }
+                                });
+                            } else if (pallet.sortationCategory && pallet.sortationCategory !== 'N/A' && pallet.sortationCategory !== 'Empty') {
+                                allCategories.add(pallet.sortationCategory);
                             }
                         }
+                        
+                        // Join all categories with separator
+                        sortationCategory = allCategories.size > 0 ? Array.from(allCategories).sort().join(', ') : 'N/A';
                         
                         // Deep scan: Get actual units from each pallet for accuracy
                         progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
@@ -1603,15 +1795,22 @@
                 categoryStats[category].pallets += dz.totalPallets;
                 categoryStats[category].units += dz.totalUnits;
                 
-                // Count sortation categories
+                // Count sortation categories - handle multiple categories separated by commas
                 const sortCat = dz.sortationCategory;
                 if (sortCat && sortCat !== 'N/A' && sortCat !== 'Empty') {
-                    if (!sortationStats[sortCat]) {
-                        sortationStats[sortCat] = { zones: 0, pallets: 0, units: 0 };
-                    }
-                    sortationStats[sortCat].zones++;
-                    sortationStats[sortCat].pallets += dz.totalPallets;
-                    sortationStats[sortCat].units += dz.totalUnits;
+                    // Split by comma and process each category separately
+                    const categories = sortCat.split(',').map(cat => cat.trim()).filter(cat => cat && cat !== 'N/A' && cat !== 'Empty');
+                    
+                    categories.forEach(category => {
+                        if (!sortationStats[category]) {
+                            sortationStats[category] = { zones: 0, pallets: 0, units: 0 };
+                        }
+                        // For multiple categories in one zone, count fractional contribution
+                        const contribution = 1 / categories.length;
+                        sortationStats[category].zones += contribution;
+                        sortationStats[category].pallets += Math.round(dz.totalPallets * contribution);
+                        sortationStats[category].units += Math.round(dz.totalUnits * contribution);
+                    });
                 }
             } else if (dz.status === 'Empty') {
                 categoryStats[category].empty++;
@@ -1671,7 +1870,7 @@
                     ${Object.keys(sortationStats).sort().map(category => `
                         <div style="padding: 15px; background: #f1f3f4; border-radius: 8px; border-left: 4px solid #007bff;">
                             <div style="font-weight: bold; color: #495057; margin-bottom: 8px; font-size: 14px;">${category}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${sortationStats[category].zones}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${Math.round(sortationStats[category].zones)}</strong></div>
                             <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
                             <div style="font-size: 12px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
                         </div>
@@ -1778,15 +1977,22 @@
                 categoryStats[category].pallets += dz.palletCount || 0;
                 categoryStats[category].units += dz.unitCount || 0;
                 
-                // Count sortation categories
+                // Count sortation categories - handle multiple categories separated by commas
                 const sortCat = dz.sortationCategory;
                 if (sortCat && sortCat !== 'N/A' && sortCat !== 'Empty') {
-                    if (!sortationStats[sortCat]) {
-                        sortationStats[sortCat] = { zones: 0, pallets: 0, units: 0 };
-                    }
-                    sortationStats[sortCat].zones++;
-                    sortationStats[sortCat].pallets += dz.palletCount || 0;
-                    sortationStats[sortCat].units += dz.unitCount || 0;
+                    // Split by comma and process each category separately
+                    const categories = sortCat.split(',').map(cat => cat.trim()).filter(cat => cat && cat !== 'N/A' && cat !== 'Empty');
+                    
+                    categories.forEach(category => {
+                        if (!sortationStats[category]) {
+                            sortationStats[category] = { zones: 0, pallets: 0, units: 0 };
+                        }
+                        // For multiple categories in one zone, count fractional contribution
+                        const contribution = 1 / categories.length;
+                        sortationStats[category].zones += contribution;
+                        sortationStats[category].pallets += Math.round((dz.palletCount || 0) * contribution);
+                        sortationStats[category].units += Math.round((dz.unitCount || 0) * contribution);
+                    });
                 }
             } else if (dz.status === 'Empty') {
                 categoryStats[category].empty++;
@@ -1846,7 +2052,7 @@
                     ${Object.keys(sortationStats).sort().map(category => `
                         <div style="padding: 15px; background: #f1f3f4; border-radius: 8px; border-left: 4px solid #6f42c1;">
                             <div style="font-weight: bold; color: #495057; margin-bottom: 8px; font-size: 14px;">${category}</div>
-                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${sortationStats[category].zones}</strong></div>
+                            <div style="font-size: 12px; color: #6c757d;">Zones: <strong>${Math.round(sortationStats[category].zones)}</strong></div>
                             <div style="font-size: 12px; color: #6c757d;">Pallets: <strong>${sortationStats[category].pallets}</strong></div>
                             <div style="font-size: 12px; color: #6c757d;">Units: <strong>${sortationStats[category].units}</strong></div>
                         </div>
@@ -2116,7 +2322,7 @@
             
             if (versionMatch) {
                 const remoteVersion = versionMatch[1];
-                if (compareVersions(remoteVersion, CURRENT_VERSION) > 0) {
+                if (isNewerVersion(remoteVersion, SCRIPT_VERSION)) {
                     updateInfo.innerHTML = `
                         <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; border-radius: 4px; margin-top: 10px;">
                             <span style="color: #856404; font-size: 12px;">📢 Update available: v${remoteVersion}</span>
@@ -2182,11 +2388,8 @@
         }
     }
 
-    // Auto-update functionality
-    const CURRENT_VERSION = '1.7';
-    const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.js';
-    
-    async function checkForUpdates() {
+    // Auto-update functionality (legacy)
+    async function checkForUpdatesLegacy() {
         try {
             // Check if we've checked recently (don't spam GitHub)
             const lastCheck = localStorage.getItem('riv-last-update-check');
@@ -2212,7 +2415,7 @@
             const remoteVersion = versionMatch[1];
             localStorage.setItem('riv-last-update-check', now.toString());
             
-            if (compareVersions(remoteVersion, CURRENT_VERSION) > 0) {
+            if (compareVersionsOld(remoteVersion, SCRIPT_VERSION) > 0) {
                 showUpdateNotification(remoteVersion, scriptContent);
             }
             
@@ -2221,7 +2424,7 @@
         }
     }
     
-    function compareVersions(version1, version2) {
+    function compareVersionsOld(version1, version2) {
         const v1Parts = version1.split('.').map(Number);
         const v2Parts = version2.split('.').map(Number);
         
@@ -2263,7 +2466,7 @@
                 <strong>RIV-ReloUp Update Available!</strong>
             </div>
             <p style="margin: 5px 0;">Version ${newVersion} is available</p>
-            <p style="margin: 5px 0; font-size: 12px; opacity: 0.9;">Current: ${CURRENT_VERSION}</p>
+            <p style="margin: 5px 0; font-size: 12px; opacity: 0.9;">Current: ${SCRIPT_VERSION}</p>
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button id="update-now" style="
                     background: rgba(255,255,255,0.2);
@@ -2350,7 +2553,7 @@
         modal.innerHTML = `
             <div style="text-align: center; margin-bottom: 20px;">
                 <h2 style="color: #333; margin-bottom: 10px;">🔄 Update RIV-ReloUp</h2>
-                <p style="color: #666;">Version ${CURRENT_VERSION} → ${newVersion}</p>
+                <p style="color: #666;">Version ${SCRIPT_VERSION} → ${newVersion}</p>
             </div>
             
             <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
@@ -2710,10 +2913,7 @@
         
         // Check for updates (delayed to not interfere with main functionality)
         setTimeout(() => {
-            const skipVersion = localStorage.getItem('riv-skip-version');
-            if (!skipVersion || skipVersion !== CURRENT_VERSION) {
-                checkForUpdates();
-            }
+            checkForUpdates(); // Use new auto-update system
         }, 5000); // Check after 5 seconds
         
         console.log('📄 Fast container analysis ready - Full functionality enabled');
