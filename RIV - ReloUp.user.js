@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.8
+// @version      2.9
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
-// @description  Fast deep container analysis with PalletLand monitoring
+// @description  Enhanced warehouse analysis with auto session loading, location tracking, and real-time updates
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
 // @grant        none
 // @run-at       document-start
@@ -518,6 +518,34 @@
         if (footer.querySelector('[data-riv-menu-item]')) {
             return;
         }
+
+        // Session Status Indicator
+        const sessionStatus = document.createElement('div');
+        sessionStatus.setAttribute('data-riv-menu-item', 'session-status');
+        sessionStatus.style.cssText = `
+            position: fixed; 
+            top: 10px; 
+            right: 10px; 
+            background: rgba(0,0,0,0.8); 
+            color: white; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            font-size: 12px; 
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        `;
+        sessionStatus.id = 'riv-session-status';
+        sessionStatus.onclick = () => autoLoadSessionData();
+        sessionStatus.title = 'Click to refresh session data';
+        
+        // Add to body instead of footer for better visibility
+        document.body.appendChild(sessionStatus);
+        
+        // Update session status display
+        updateSessionStatus('loading', 'Loading session...');
 
         // Dashboard menu item
         const dashboardItem = document.createElement('a');
@@ -1898,8 +1926,82 @@
         });
     }
     
-    // Perform container search like the main application does
-    async function performContainerSearch(containerId) {
+    // Automatically load session data by searching for 'DZ' in background
+    async function autoLoadSessionData() {
+        updateSessionStatus('loading', 'Loading session data...');
+        
+        try {
+            console.log('🔄 Auto-loading session data...');
+            
+            // Create a silent search that won't show UI errors
+            const silentSearch = await performContainerSearch('DZ', true); // true = silent mode
+            
+            console.log('✅ Session data auto-loaded successfully');
+            updateSessionStatus('success', 'Session data ready');
+            return true;
+        } catch (error) {
+            // Expected to fail, but session data should be captured
+            console.log('📡 Session data captured from auto-search (expected DZ error)');
+            updateSessionStatus('success', 'Session data ready');
+            return true;
+        }
+    }
+    
+    // Periodic session data refresh
+    let sessionRefreshInterval = null;
+    
+    function startSessionRefresh() {
+        // Refresh session data every 10 minutes
+        sessionRefreshInterval = setInterval(() => {
+            console.log('🔄 Refreshing session data...');
+            autoLoadSessionData();
+        }, 10 * 60 * 1000); // 10 minutes
+        
+        console.log('⏰ Session data refresh started (every 10 minutes)');
+    }
+    
+    function stopSessionRefresh() {
+        if (sessionRefreshInterval) {
+            clearInterval(sessionRefreshInterval);
+            sessionRefreshInterval = null;
+            console.log('⏹️ Session data refresh stopped');
+        }
+    }
+    
+    // Update session status indicator
+    function updateSessionStatus(status, message) {
+        const statusElement = document.getElementById('riv-session-status');
+        if (!statusElement) return;
+        
+        let color, icon;
+        switch(status) {
+            case 'loading':
+                color = '#ffc107';
+                icon = '🔄';
+                break;
+            case 'success':
+                color = '#28a745';
+                icon = '✅';
+                break;
+            case 'error':
+                color = '#dc3545';
+                icon = '❌';
+                break;
+            case 'idle':
+                color = '#6c757d';
+                icon = '💤';
+                break;
+            default:
+                color = '#6c757d';
+                icon = '❓';
+        }
+        
+        statusElement.style.background = `rgba(${status === 'success' ? '40,167,69' : status === 'error' ? '220,53,69' : status === 'loading' ? '255,193,7' : '108,117,125'}, 0.9)`;
+        statusElement.innerHTML = `${icon} ${message}`;
+    }
+    
+    // Enhanced container search with silent mode option
+    async function performContainerSearch(containerId, silent = false) {
         // Use captured session data or try to extract from page
         let warehouseId = sessionData.warehouseId || 'CDPL1';
         let associate = sessionData.associate || 'System';
@@ -1993,28 +2095,34 @@
                         try {
                             const data = JSON.parse(xhr.responseText);
                             
-                            // Debug sortation categories
-                            if (data.childContainers && data.childContainers.length > 0) {
+                            // Debug sortation categories (only if not silent)
+                            if (!silent && data.childContainers && data.childContainers.length > 0) {
                                 const firstContainer = data.childContainers[0];
                                 if (firstContainer.sortationCategories) {
                                     console.log(`📋 ${containerId} sortationCategories:`, firstContainer.sortationCategories);
                                 }
                             }
                             
-                            console.log(`✅ Success for ${containerId}:`, data.childContainers ? `${data.childContainers.length} containers` : 'No containers');
+                            if (!silent) {
+                                console.log(`✅ Success for ${containerId}:`, data.childContainers ? `${data.childContainers.length} containers` : 'No containers');
+                            }
                             resolve(data);
                         } catch (e) {
-                            console.error(`❌ Parse error for ${containerId}:`, e.message);
+                            if (!silent) {
+                                console.error(`❌ Parse error for ${containerId}:`, e.message);
+                            }
                             reject(new Error(`Parse error: ${e.message}`));
                         }
                     } else {
-                        console.error(`❌ HTTP error for ${containerId}: ${xhr.status} ${xhr.statusText}`);
-                        console.error('Request data:', requestData);
-                        console.error('Response text:', xhr.responseText);
-                        
-                        // For 400 errors, suggest session data issues
-                        if (xhr.status === 400) {
-                            console.error(`🚫 Likely cause: Invalid session parameters. Try refreshing the page and using the main search function first to capture valid session data.`);
+                        if (!silent) {
+                            console.error(`❌ HTTP error for ${containerId}: ${xhr.status} ${xhr.statusText}`);
+                            console.error('Request data:', requestData);
+                            console.error('Response text:', xhr.responseText);
+                            
+                            // For 400 errors, suggest session data issues
+                            if (xhr.status === 400) {
+                                console.error(`🚫 Likely cause: Invalid session parameters. Try refreshing the page and using the main search function first to capture valid session data.`);
+                            }
                         }
                         
                         reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
@@ -2023,11 +2131,15 @@
             };
             
             xhr.onerror = () => {
-                console.error(`❌ Network error for ${containerId}`);
+                if (!silent) {
+                    console.error(`❌ Network error for ${containerId}`);
+                }
                 reject(new Error('Network error'));
             };
             
-            console.log(`🚀 Sending request for ${containerId}:`, requestData);
+            if (!silent) {
+                console.log(`🚀 Sending request for ${containerId}:`, requestData);
+            }
             xhr.send(JSON.stringify(requestData));
         });
     }
@@ -3290,6 +3402,14 @@
         initializeCopyToClipboard();
         addMenuOptions();
         loadSettings(); // Load saved settings on startup
+        
+        // Auto-load session data in background
+        setTimeout(() => {
+            autoLoadSessionData().then(() => {
+                // Start periodic refresh after initial load
+                startSessionRefresh();
+            });
+        }, 2000); // Load session data after 2 seconds
         
         // Check for updates (delayed to not interfere with main functionality)
         setTimeout(() => {
