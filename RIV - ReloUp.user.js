@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.5
+// @version      3.6
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -1046,7 +1046,7 @@
                                 transition: all 0.3s ease;
                                 box-shadow: 0 2px 4px rgba(23,162,184,0.3);
                                 margin-left: 10px;
-                            ">🔍 Deep Scan</button>
+                            ">🔍 Full Scan</button>
                             
                             <button id="export-dashboard" disabled style="
                                 background: #6c757d;
@@ -1505,7 +1505,7 @@
         
         // Show scanning type message
         if (deepScan) {
-            progressText.textContent = 'Starting Dashboard deep scan - accurate unit counting...';
+            progressText.textContent = 'Starting Dashboard full scan - accurate unit counting...';
         } else {
             progressText.textContent = 'Starting Dashboard surface scan - pallets only (no units)...';
         }
@@ -1575,7 +1575,7 @@
                         
                         if (deepScan) {
                             // Deep scan: Get actual units from each pallet
-                            progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
+                            progressText.textContent = `Full scanning ${dropZoneId} - ${totalPallets} pallets...`;
                             
                             for (const pallet of searchDetails.childContainers) {
                                 try {
@@ -1655,7 +1655,7 @@
             
             progressBar.style.width = `${percentage}%`;
             progressPercentage.textContent = `${percentage}%`;
-            progressText.textContent = `Deep scanned ${completedZones}/${totalZones} zones`;
+            progressText.textContent = `Full scanned ${completedZones}/${totalZones} zones`;
             
             // Update dashboard display with current data
             updateDashboardDisplay();
@@ -1793,7 +1793,7 @@
         }
         
         // Show scanning status
-        progressText.textContent = 'Starting PalletLand deep scan - accurate unit counting...';
+        progressText.textContent = 'Starting PalletLand full scan - accurate unit counting...';
         progressPercentage.textContent = 'Starting';
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -1841,7 +1841,7 @@
                         sortationCategory = allCategories.size > 0 ? Array.from(allCategories).sort().join(', ') : 'N/A';
                         
                         // Deep scan: Get actual units from each pallet for accuracy
-                        progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
+                        progressText.textContent = `Full scanning ${dropZoneId} - ${totalPallets} pallets...`;
                         
                         for (const pallet of searchDetails.childContainers) {
                             try {
