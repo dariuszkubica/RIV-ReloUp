@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      2.5
+// @version      2.8
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -18,7 +18,7 @@
 (function() {
     'use strict';
     
-    const SCRIPT_VERSION = '2.5';
+    const SCRIPT_VERSION = '2.8';
     const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.user.js';
     
     console.log('🚀 RIV - ReloUp script starting (Speed Optimized)...');
@@ -152,6 +152,49 @@
         }, 3000);
         
         console.log(`🚀 Update available! Version ${newVersion} - Visit: ${GITHUB_RAW_URL}`);
+    }
+    
+    // Category to Main Destination mapping
+    const categoryDestinationMap = {
+        '2 - NON TECH TTA': 'BTS2',
+        '9 - SPECIALITY URGENT': 'BTS2',
+        '9 - SPECIALTY URGENT': 'BTS2',  // Alternative spelling
+        '7 - HRV URGENT': 'BTS2',
+        '5 - FAST PROCESSING TTA': 'BTS2',
+        '1 - TECH TTA': 'BTS2',
+        'PROBLEM SOLVE': 'KTW1',
+        '3 - APPAREL TTA': 'KTW1',
+        'APPAREL URGENT': 'KTW1',
+        'S&A FAST PROCESSING TTA': 'KTW1',
+        'SHOES URGENT': 'KTW1',
+        'BROKEN AND LEAKING': 'KTW1',
+        'SHARP': 'KTW1',
+        'BWS': 'KTW1',
+        '8 - BMVD URGENT': 'LCJ4',
+        'URGENT LCJ4': 'LCJ4',
+        'NON TECH TTA LCJ4': 'LCJ4',
+        '4 - LOW VALUE TTA': 'LCJ4',
+        'Tech TTA LCJ4': 'LCJ4',
+        '0 - NON-SORT': 'WRO1'
+    };
+    
+    // Get main destination for category
+    function getMainDestination(sortationCategory) {
+        if (!sortationCategory || sortationCategory === 'N/A' || sortationCategory === 'Empty') {
+            return 'Unknown';
+        }
+        
+        // Handle multiple categories separated by commas
+        const categories = sortationCategory.split(',').map(cat => cat.trim());
+        const destinations = new Set();
+        
+        categories.forEach(category => {
+            const destination = categoryDestinationMap[category] || 'Unknown';
+            destinations.add(destination);
+        });
+        
+        // If multiple destinations, join them
+        return Array.from(destinations).sort().join(', ');
     }
     
     // Global session data storage
@@ -650,6 +693,36 @@
                 
                 <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
                     <strong>Dashboard vs PalletLand:</strong> Dashboard is for quick overview (fewer zones), PalletLand for comprehensive analysis (many zones)
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #555; margin-bottom: 10px;">🎯 Category to Destination Mapping</h3>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 style="color: #666; margin: 0 0 10px 0;">Current Mapping:</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto;">
+                        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #007bff;">
+                            <div style="font-weight: bold; font-size: 12px; color: #007bff; margin-bottom: 5px;">BTS2</div>
+                            <div style="font-size: 10px; color: #666; line-height: 1.3;">2 - NON TECH TTA<br>9 - SPECIALITY URGENT<br>7 - HRV URGENT<br>+2 more...</div>
+                        </div>
+                        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #28a745;">
+                            <div style="font-weight: bold; font-size: 12px; color: #28a745; margin-bottom: 5px;">KTW1</div>
+                            <div style="font-size: 10px; color: #666; line-height: 1.3;">PROBLEM SOLVE<br>3 - APPAREL TTA<br>APPAREL URGENT<br>+5 more...</div>
+                        </div>
+                        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #ffc107;">
+                            <div style="font-weight: bold; font-size: 12px; color: #ffc107; margin-bottom: 5px;">LCJ4</div>
+                            <div style="font-size: 10px; color: #666; line-height: 1.3;">8 - BMVD URGENT<br>URGENT LCJ4<br>NON TECH TTA LCJ4<br>+2 more...</div>
+                        </div>
+                        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #6f42c1;">
+                            <div style="font-weight: bold; font-size: 12px; color: #6f42c1; margin-bottom: 5px;">WRO1</div>
+                            <div style="font-size: 10px; color: #666; line-height: 1.3;">0 - NON-SORT</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
+                    <strong>How it works:</strong> Categories from your Drop Zone analysis are automatically grouped into main destinations (BTS2, KTW1, LCJ4, WRO1) for better logistics overview.
                 </div>
             </div>
 
@@ -1971,7 +2044,8 @@
         const totalPalletsAll = dashboardData.reduce((sum, dz) => sum + dz.totalPallets, 0);
         const totalUnitsAll = dashboardData.reduce((sum, dz) => sum + dz.totalUnits, 0);
         
-        // Group by sortation category only
+        // Group by main destinations and sortation category
+        const destinationStats = {};
         const sortationStats = {};
         
         dashboardData.forEach(dz => {
@@ -1991,6 +2065,52 @@
                         sortationStats[category].zones += contribution;
                         sortationStats[category].pallets += Math.round(dz.totalPallets * contribution);
                         sortationStats[category].units += Math.round(dz.totalUnits * contribution);
+                        
+                        // Group by main destination
+                        const mainDestination = getMainDestination(category);
+                        if (!destinationStats[mainDestination]) {
+                            destinationStats[mainDestination] = { 
+                                zones: 0, 
+                                pallets: 0, 
+                                units: 0, 
+                                categories: new Set(),
+                                categoryDetails: {} // Track per-category stats
+                            };
+                        }
+                        
+                        // Add to category details
+                        if (!destinationStats[mainDestination].categoryDetails[category]) {
+                            destinationStats[mainDestination].categoryDetails[category] = {
+                                zones: 0,
+                                pallets: 0,
+                                units: 0,
+                                locations: {} // Track per-location data
+                            };
+                        }
+                        
+                        // Add location data
+                        if (!destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId]) {
+                            destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId] = {
+                                pallets: 0,
+                                units: 0
+                            };
+                        }
+                        
+                        const palletContribution = Math.round(dz.totalPallets * contribution);
+                        const unitContribution = Math.round(dz.totalUnits * contribution);
+                        
+                        destinationStats[mainDestination].zones += contribution;
+                        destinationStats[mainDestination].pallets += palletContribution;
+                        destinationStats[mainDestination].units += unitContribution;
+                        destinationStats[mainDestination].categories.add(category);
+                        
+                        destinationStats[mainDestination].categoryDetails[category].zones += contribution;
+                        destinationStats[mainDestination].categoryDetails[category].pallets += palletContribution;
+                        destinationStats[mainDestination].categoryDetails[category].units += unitContribution;
+                        
+                        // Update location-specific data
+                        destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId].pallets += palletContribution;
+                        destinationStats[mainDestination].categoryDetails[category].locations[dz.dropZoneId].units += unitContribution;
                     });
                 }
             }
@@ -2026,6 +2146,76 @@
                 </div>
                 
             </div>
+            
+            <!-- Main Destinations -->
+            ${Object.keys(destinationStats).length > 0 ? `
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 Main Destinations</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    ${Object.keys(destinationStats).sort().map(destination => {
+                        const stats = destinationStats[destination];
+                        const categoryCount = stats.categories.size;
+                        const colors = {
+                            'BTS2': '#007bff',
+                            'KTW1': '#28a745', 
+                            'LCJ4': '#ffc107',
+                            'WRO1': '#6f42c1',
+                            'Unknown': '#6c757d'
+                        };
+                        const color = colors[destination] || '#6c757d';
+                        
+                        return `
+                        <div style="padding: 20px; background: linear-gradient(135deg, ${color}15, ${color}08); border-radius: 12px; border-left: 4px solid ${color}; position: relative;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div style="font-weight: bold; color: ${color}; font-size: 18px;">${destination}</div>
+                                <div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">${categoryCount} categories</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${Math.round(stats.zones)}</div>
+                                    <div style="font-size: 11px; color: #666;">Zones</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${stats.pallets}</div>
+                                    <div style="font-size: 11px; color: #666;">Pallets</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${stats.units}</div>
+                                    <div style="font-size: 11px; color: #666;">Units</div>
+                                </div>
+                            </div>
+                            <!-- Location-Category-Pallets table -->
+                            ${stats.categoryDetails && Object.keys(stats.categoryDetails).length > 0 ? `
+                            <div style="margin-top: 12px;">
+                                <div style="font-size: 12px; font-weight: bold; color: #495057; margin-bottom: 8px;">Location Details:</div>
+                                <div style="max-height: 150px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 6px 8px; background: #f8f9fa; font-size: 10px; font-weight: bold; color: #495057; border-bottom: 1px solid #e0e0e0;">
+                                        <div>Location</div>
+                                        <div>Category</div>
+                                        <div style="text-align: center;">Pallets</div>
+                                    </div>
+                                    ${Object.entries(stats.categoryDetails).map(([category, details]) => 
+                                        Object.entries(details.locations || {}).map(([location, data]) => `
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 4px 8px; font-size: 9px; border-bottom: 1px solid #f0f0f0;">
+                                                <div style="color: #6c757d; overflow: hidden; text-overflow: ellipsis;">${location}</div>
+                                                <div style="color: #495057; overflow: hidden; text-overflow: ellipsis;">${category}</div>
+                                                <div style="text-align: center; font-weight: bold; color: ${color};">${data.pallets || 0}</div>
+                                            </div>
+                                        `).join('')
+                                    ).join('')}
+                                </div>
+                            </div>
+                            ` : `
+                            <div style="font-size: 11px; color: #888; line-height: 1.3;">
+                                Categories: ${Array.from(stats.categories).slice(0, 2).join(', ')}${stats.categories.size > 2 ? ` +${stats.categories.size - 2} more` : ''}
+                            </div>
+                            `}
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            ` : ''}
             
             <!-- Sortation Categories -->
             ${Object.keys(sortationStats).length > 0 ? `
@@ -2208,6 +2398,76 @@
                     `).join('')}
                 </div>
             </div>
+            
+            <!-- Main Destinations -->
+            ${Object.keys(destinationStats).length > 0 ? `
+            <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 20px 0; color: #333;">🎯 Main Destinations</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    ${Object.keys(destinationStats).sort().map(destination => {
+                        const stats = destinationStats[destination];
+                        const categoryCount = stats.categories.size;
+                        const colors = {
+                            'BTS2': '#007bff',
+                            'KTW1': '#28a745', 
+                            'LCJ4': '#ffc107',
+                            'WRO1': '#6f42c1',
+                            'Unknown': '#6c757d'
+                        };
+                        const color = colors[destination] || '#6c757d';
+                        
+                        return `
+                        <div style="padding: 20px; background: linear-gradient(135deg, ${color}15, ${color}08); border-radius: 12px; border-left: 4px solid ${color}; position: relative;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div style="font-weight: bold; color: ${color}; font-size: 18px;">${destination}</div>
+                                <div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">${categoryCount} categories</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${Math.round(stats.zones)}</div>
+                                    <div style="font-size: 11px; color: #666;">Zones</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${stats.pallets}</div>
+                                    <div style="font-size: 11px; color: #666;">Pallets</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 20px; font-weight: bold; color: ${color};">${stats.units}</div>
+                                    <div style="font-size: 11px; color: #666;">Units</div>
+                                </div>
+                            </div>
+                            <!-- Location-Category-Pallets table -->
+                            ${stats.categoryDetails && Object.keys(stats.categoryDetails).length > 0 ? `
+                            <div style="margin-top: 12px;">
+                                <div style="font-size: 12px; font-weight: bold; color: #495057; margin-bottom: 8px;">Location Details:</div>
+                                <div style="max-height: 150px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 6px 8px; background: #f8f9fa; font-size: 10px; font-weight: bold; color: #495057; border-bottom: 1px solid #e0e0e0;">
+                                        <div>Location</div>
+                                        <div>Category</div>
+                                        <div style="text-align: center;">Pallets</div>
+                                    </div>
+                                    ${Object.entries(stats.categoryDetails).map(([category, details]) => 
+                                        Object.entries(details.locations || {}).map(([location, data]) => `
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 4px 8px; font-size: 9px; border-bottom: 1px solid #f0f0f0;">
+                                                <div style="color: #6c757d; overflow: hidden; text-overflow: ellipsis;">${location}</div>
+                                                <div style="color: #495057; overflow: hidden; text-overflow: ellipsis;">${category}</div>
+                                                <div style="text-align: center; font-weight: bold; color: ${color};">${data.pallets || 0}</div>
+                                            </div>
+                                        `).join('')
+                                    ).join('')}
+                                </div>
+                            </div>
+                            ` : `
+                            <div style="font-size: 11px; color: #888; line-height: 1.3;">
+                                Categories: ${Array.from(stats.categories).slice(0, 2).join(', ')}${stats.categories.size > 2 ? ` +${stats.categories.size - 2} more` : ''}
+                            </div>
+                            `}
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            ` : ''}
             
             <!-- Sortation Categories -->
             ${Object.keys(sortationStats).length > 0 ? `
