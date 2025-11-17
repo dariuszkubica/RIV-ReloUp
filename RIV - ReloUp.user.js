@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV - ReloUp
 // @namespace    KTW1
-// @version      3.0
+// @version      3.1
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -960,6 +960,19 @@
                     <div style="background: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                         <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
                             <button id="refresh-dashboard" style="
+                                background: #28a745;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 2px 4px rgba(40,167,69,0.3);
+                            ">🔄 Refresh</button>
+                            
+                            <button id="deep-scan-dashboard" style="
                                 background: #17a2b8;
                                 color: white;
                                 border: none;
@@ -970,7 +983,8 @@
                                 font-weight: 500;
                                 transition: all 0.3s ease;
                                 box-shadow: 0 2px 4px rgba(23,162,184,0.3);
-                            ">🔄 Deep Scan</button>
+                                margin-left: 10px;
+                            ">🔍 Deep Scan</button>
                             
                             <button id="export-dashboard" disabled style="
                                 background: #6c757d;
@@ -1036,7 +1050,8 @@
         // Add CSS for hover effects
         const style = document.createElement('style');
         style.textContent = `
-            #refresh-dashboard:hover { background: #138496 !important; transform: translateY(-1px); }
+            #refresh-dashboard:hover { background: #218838 !important; transform: translateY(-1px); }
+            #deep-scan-dashboard:hover { background: #138496 !important; transform: translateY(-1px); }
             #export-dashboard:not(:disabled):hover { background: #545b62 !important; transform: translateY(-1px); opacity: 1 !important; }
             #close-dashboard:hover { background: rgba(255,255,255,0.3) !important; }
         `;
@@ -1044,7 +1059,8 @@
 
         // Event listeners
         document.getElementById('close-dashboard').onclick = () => closeDashboard(overlay);
-        document.getElementById('refresh-dashboard').onclick = () => startDashboardScan();
+        document.getElementById('refresh-dashboard').onclick = () => startDashboardScan(false); // Surface scan
+        document.getElementById('deep-scan-dashboard').onclick = () => startDashboardScan(true); // Deep scan
         document.getElementById('export-dashboard').onclick = () => exportDashboardData();
         
         // Close on overlay click
@@ -1336,14 +1352,15 @@
         return destinations;
     }
 
-    async function startDashboardScan() {
-        console.log('🔥 DEBUG: startDashboardScan() called - scanning Dashboard destinations');
+    async function startDashboardScan(deepScan = false) {
+        console.log(`🔥 DEBUG: startDashboardScan() called - scanning Dashboard destinations (${deepScan ? 'deep' : 'surface'} scan)`);
         dashboardData = [];
         const progressDiv = document.getElementById('scan-progress');
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
         const progressPercentage = document.getElementById('progress-percentage');
         const refreshBtn = document.getElementById('refresh-dashboard');
+        const deepScanBtn = document.getElementById('deep-scan-dashboard');
         const exportBtn = document.getElementById('export-dashboard');
         
         // Check session data first
@@ -1424,8 +1441,12 @@
             }
         }
         
-        // Show deep scanning warning
-        progressText.textContent = 'Starting Dashboard deep scan - accurate unit counting...';
+        // Show scanning type message
+        if (deepScan) {
+            progressText.textContent = 'Starting Dashboard deep scan - accurate unit counting...';
+        } else {
+            progressText.textContent = 'Starting Dashboard surface scan - pallets only (no units)...';
+        }
         progressPercentage.textContent = 'Starting';
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -1436,6 +1457,7 @@
             progressText.textContent = 'No destinations configured. Please check PalletLand settings.';
             progressPercentage.textContent = 'Error';
             refreshBtn.disabled = false;
+            deepScanBtn.disabled = false;
             exportBtn.disabled = false;
             return;
         }
@@ -1489,35 +1511,42 @@
                         // Join all categories with separator
                         sortationCategory = allCategories.size > 0 ? Array.from(allCategories).sort().join(', ') : 'N/A';
                         
-                        // Deep scan: Get actual units from each pallet
-                        progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
-                        
-                        for (const pallet of searchDetails.childContainers) {
-                            try {
-                                // Get detailed contents of this pallet
-                                const palletDetails = await performContainerSearch(pallet.containerId);
-                                
-                                if (palletDetails && palletDetails.childContainers && Array.isArray(palletDetails.childContainers)) {
-                                    // Count units in this pallet
-                                    const palletUnits = palletDetails.childContainers.reduce((sum, tote) => {
-                                        return sum + (tote.numOfChildContainers || 0);
-                                    }, 0);
+                        if (deepScan) {
+                            // Deep scan: Get actual units from each pallet
+                            progressText.textContent = `Deep scanning ${dropZoneId} - ${totalPallets} pallets...`;
+                            
+                            for (const pallet of searchDetails.childContainers) {
+                                try {
+                                    // Get detailed contents of this pallet
+                                    const palletDetails = await performContainerSearch(pallet.containerId);
                                     
-                                    totalUnits += palletUnits;
-                                    
-                                    console.log(`📦 ${dropZoneId} > ${pallet.containerId}: ${palletDetails.childContainers.length} totes, ${palletUnits} units`);
-                                } else {
+                                    if (palletDetails && palletDetails.childContainers && Array.isArray(palletDetails.childContainers)) {
+                                        // Count units in this pallet
+                                        const palletUnits = palletDetails.childContainers.reduce((sum, tote) => {
+                                            return sum + (tote.numOfChildContainers || 0);
+                                        }, 0);
+                                        
+                                        totalUnits += palletUnits;
+                                        
+                                        console.log(`📦 ${dropZoneId} > ${pallet.containerId}: ${palletDetails.childContainers.length} totes, ${palletUnits} units`);
+                                    } else {
+                                        // Fallback: use numOfChildContainers from parent data
+                                        totalUnits += (pallet.numOfChildContainers || 0);
+                                    }
+                                } catch (palletError) {
+                                    console.warn(`⚠️ Error scanning pallet ${pallet.containerId}:`, palletError.message);
                                     // Fallback: use numOfChildContainers from parent data
                                     totalUnits += (pallet.numOfChildContainers || 0);
                                 }
-                            } catch (palletError) {
-                                console.warn(`⚠️ Error scanning pallet ${pallet.containerId}:`, palletError.message);
-                                // Fallback: use numOfChildContainers from parent data
-                                totalUnits += (pallet.numOfChildContainers || 0);
                             }
+                        } else {
+                            // Surface scan: Don't count units to avoid misleading data
+                            totalUnits = 0; // Not counted in surface scan
+                            
+                            console.log(`📄 ${dropZoneId} surface scan: ${totalPallets} pallets (units not counted)`);
                         }
                         
-                        console.log(`🏁 ${dropZoneId} summary: ${totalPallets} pallets, ${totalUnits} total units`);
+                        console.log(`🏁 ${dropZoneId} summary: ${totalPallets} pallets${deepScan ? `, ${totalUnits} accurate units` : ' (units not scanned)'}`);
                     }
                     
                     return {
@@ -1573,6 +1602,7 @@
         // Hide progress and enable buttons
         progressDiv.style.display = 'none';
         refreshBtn.disabled = false;
+        deepScanBtn.disabled = false;
         exportBtn.disabled = false;
         exportBtn.style.opacity = '1';
         
@@ -2643,10 +2673,17 @@
                         <div style="font-size: 24px; font-weight: bold; color: #6f42c1;">${totalPalletsAll}</div>
                         <div style="font-size: 14px; color: #666;">Total Pallets</div>
                     </div>
+                    ${dashboardData.some(dz => dz.totalUnits > 0) ? `
                     <div style="text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #764ba2;">${totalUnitsAll}</div>
                         <div style="font-size: 14px; color: #666;">Total Units</div>
                     </div>
+                    ` : `
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #999;">N/A</div>
+                        <div style="font-size: 14px; color: #666;">Units (surface scan)</div>
+                    </div>
+                    `}
                 </div>
                 
                 <!-- Category Breakdown -->
