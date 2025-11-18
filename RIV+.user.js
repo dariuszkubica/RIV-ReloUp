@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.9
+// @version      3.9.1
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -2311,7 +2311,9 @@
     // Extract session data from page elements
     async function extractSessionFromPage() {
         try {
-            // Method 1: Check localStorage
+            console.log('🔍 Extracting session data from page...');
+            
+            // Method 1: Check localStorage for session data
             const storageKeys = Object.keys(localStorage);
             for (const key of storageKeys) {
                 try {
@@ -2322,13 +2324,13 @@
                             sessionData.warehouseId = data.warehouseId;
                             console.log('🎯 Found warehouseId in localStorage:', data.warehouseId);
                         }
-                        if (data.associate && data.associate !== 'System') {
+                        if (data.associate && data.associate !== 'System' && data.associate !== SCRIPT_METADATA.author) {
                             sessionData.associate = data.associate;
-                            console.log('🎯 Found associate in localStorage:', data.associate);
+                            console.log('🎯 Found valid associate in localStorage:', data.associate);
                         }
-                        if (data.username && data.username !== 'System') {
+                        if (data.username && data.username !== 'System' && data.username !== SCRIPT_METADATA.author) {
                             sessionData.associate = data.username;
-                            console.log('🎯 Found username in localStorage:', data.username);
+                            console.log('🎯 Found valid username in localStorage:', data.username);
                         }
                     }
                 } catch (e) {
@@ -2336,17 +2338,35 @@
                 }
             }
             
-            // Method 2: Check window objects
-            if (window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig) {
-                const state = window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig;
-                if (state.user) {
-                    if (state.user.warehouseId) sessionData.warehouseId = state.user.warehouseId;
-                    if (state.user.associate) sessionData.associate = state.user.associate;
-                    if (state.user.username) sessionData.associate = state.user.username;
+            // Method 2: Try to get current user from application UI/cookies
+            if (!sessionData.associate || sessionData.associate === SCRIPT_METADATA.author) {
+                console.log('🔍 Attempting to get current user from application...');
+                const currentUser = getCurrentUser();
+                if (currentUser && currentUser !== SCRIPT_METADATA.author) {
+                    sessionData.associate = currentUser;
+                    console.log('✅ Found current user from application:', currentUser);
+                } else {
+                    console.log('⚠️ Could not detect current user - waiting for manual interaction');
                 }
             }
             
-            // Method 3: Check page scripts for embedded data
+            // Method 4: Check window objects
+            if (window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig) {
+                const state = window.__INITIAL_STATE__ || window.__APP_STATE__ || window.appConfig;
+                if (state.user) {
+                    if (state.user.warehouseId && state.user.warehouseId !== 'CDPL1') {
+                        sessionData.warehouseId = state.user.warehouseId;
+                    }
+                    if (state.user.associate && state.user.associate !== 'System' && state.user.associate !== SCRIPT_METADATA.author) {
+                        sessionData.associate = state.user.associate;
+                    }
+                    if (state.user.username && state.user.username !== 'System' && state.user.username !== SCRIPT_METADATA.author) {
+                        sessionData.associate = state.user.username;
+                    }
+                }
+            }
+            
+            // Method 5: Check page scripts for embedded data
             const scripts = document.querySelectorAll('script:not([src])');
             for (const script of scripts) {
                 const text = script.textContent;
@@ -2358,12 +2378,19 @@
                         sessionData.warehouseId = warehouseMatch[1];
                         console.log('🎯 Found warehouseId in script:', warehouseMatch[1]);
                     }
-                    if (associateMatch && associateMatch[1] !== 'System') {
+                    if (associateMatch && associateMatch[1] !== 'System' && associateMatch[1] !== SCRIPT_METADATA.author) {
                         sessionData.associate = associateMatch[1];
-                        console.log('🎯 Found associate in script:', associateMatch[1]);
+                        console.log('🎯 Found valid associate in script:', associateMatch[1]);
                     }
                 }
             }
+            
+            console.log('📊 Final session data after page extraction:', {
+                warehouseId: sessionData.warehouseId,
+                associate: sessionData.associate,
+                isValid: sessionData.warehouseId && sessionData.warehouseId !== 'CDPL1' && 
+                         sessionData.associate && sessionData.associate !== 'System' && sessionData.associate !== SCRIPT_METADATA.author
+            });
             
         } catch (e) {
             console.warn('Error extracting session from page:', e);
@@ -2375,7 +2402,32 @@
         console.log('🚀 Auto-triggering session data capture at startup...');
         
         try {
-            // First try to extract from URL parameters, page elements, or localStorage
+            // First check if we already have valid session data captured from real user interactions
+            const existingSession = loadSessionFromStorage();
+            if (existingSession && existingSession.warehouseId && existingSession.associate) {
+                const isRecentAndValid = existingSession.lastCaptured && 
+                                       (Date.now() - existingSession.lastCaptured < 60 * 60 * 1000) && // Less than 1 hour old
+                                       existingSession.warehouseId !== 'CDPL1' && 
+                                       existingSession.associate !== 'System' &&
+                                       existingSession.associate !== SCRIPT_METADATA.author; // Not script author fallback
+                
+                if (isRecentAndValid) {
+                    console.log('✅ Found recent valid session data, skipping automatic capture:', {
+                        warehouseId: existingSession.warehouseId,
+                        associate: existingSession.associate,
+                        age: Math.round((Date.now() - existingSession.lastCaptured) / (1000 * 60)) + ' minutes ago'
+                    });
+                    
+                    // Update current session data from storage
+                    sessionData.update(existingSession.warehouseId, existingSession.associate);
+                    return true;
+                }
+            }
+            
+            // Wait a bit to allow the page to fully load and for getCurrentUser() to work better
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Try to extract from URL parameters, page elements, or localStorage
             let warehouseId = null;
             let associate = null;
             
@@ -2419,16 +2471,28 @@
             }
             
             if (!associate) {
-                // Try to get current logged-in user from the application
+                // Try to get current logged-in user from the application (after page load delay)
+                console.log('🔍 Attempting to detect current user from application...');
                 const currentUser = getCurrentUser();
                 if (currentUser) {
                     associate = currentUser;
-                    console.log('🔍 Found current user from application:', currentUser);
+                    console.log('✅ Found current user from application:', currentUser);
                 } else {
-                    // Ultimate fallback: use script author (this should rarely happen)
-                    associate = SCRIPT_METADATA.author;
-                    console.log('⚠️ Using script author as fallback - may not work correctly');
+                    // Before falling back to script author, try to wait for user interaction
+                    console.log('⚠️ Could not detect current user immediately');
+                    console.log('💡 Suggestion: Use manual search first to capture real user data');
+                    console.log('🚫 Skipping automatic capture to avoid using wrong user');
+                    
+                    // Don't make automatic request with script author - wait for real user data
+                    return false;
                 }
+            }
+            
+            // Double-check that we're not using script author as associate
+            if (associate === SCRIPT_METADATA.author) {
+                console.log('🚫 Detected script author as associate - this is likely wrong');
+                console.log('💡 Waiting for real user interaction to capture correct data');
+                return false;
             }
             
             console.log('🔧 Extracted session data for startup request:', {
@@ -2736,17 +2800,27 @@
         console.log('🔧 Setting known working session data...');
         
         try {
-            // From your working request example
             // Try to get current user from application
             const knownWarehouseId = SCRIPT_METADATA.namespace;
             const currentUser = getCurrentUser();
-            const knownAssociate = currentUser || SCRIPT_METADATA.author;
             
-            sessionData.update(knownWarehouseId, knownAssociate);
+            if (!currentUser) {
+                console.log('⚠️ Could not detect current user from application');
+                console.log('💡 Try using the search function manually first to capture real user data');
+                console.log('🚫 Not setting session data with script author fallback');
+                return false;
+            }
             
-            console.log('✅ Session data set to known working values:', {
+            if (currentUser === SCRIPT_METADATA.author) {
+                console.log('⚠️ Detected user matches script author - this might be incorrect');
+                console.log('💡 Consider using rivTestUserDetection() to debug user detection');
+            }
+            
+            sessionData.update(knownWarehouseId, currentUser);
+            
+            console.log('✅ Session data set with detected user:', {
                 warehouseId: knownWarehouseId,
-                associate: knownAssociate,
+                associate: currentUser,
                 note: 'Ready for Dashboard/PalletLand use'
             });
             
@@ -4367,7 +4441,9 @@
             checkForUpdates(); // Use new auto-update system
         }, 5000); // Check after 5 seconds
         
-        console.log('📄 Fast container analysis ready - Full functionality enabled');
+        console.log('📄 RIV ReloUp ready - Enhanced user detection enabled');
+        console.log('ℹ️ Automatic session capture now waits for real user detection');
+        console.log('💡 Use manual search first if automatic capture fails');
         console.log('🔧 Debug functions available:');
         console.log('   - rivTestCurrentUser() - Test current user detection');
         console.log('   - rivTestSessionCapture() - Test automatic session capture');
