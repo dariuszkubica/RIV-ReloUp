@@ -22,8 +22,8 @@
     
     // Configuration
     const SCRIPT_VERSION = '3.8.0';
-    const MODULE_BASE_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV+/main/src/';
-    const FALLBACK_BASE_URL = 'https://cdn.jsdelivr.net/gh/dariuszkubica/RIV+@main/src/';
+    const MODULE_BASE_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/src/';
+    const FALLBACK_BASE_URL = 'https://cdn.jsdelivr.net/gh/dariuszkubica/RIV-ReloUp@main/src/';
     
     // Module loading configuration
     const MODULES = [
