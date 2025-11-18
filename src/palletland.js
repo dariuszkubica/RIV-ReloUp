@@ -198,10 +198,22 @@ class PalletLandModule {
         const exportBtn = document.getElementById('export-palletland');
         
         // Check session data first
-        if (!window.sessionData.warehouseId || !window.sessionData.associate || 
+        if (!window.sessionData?.warehouseId || !window.sessionData?.associate || 
             window.sessionData.warehouseId === 'CDPL1' || window.sessionData.associate === 'System') {
             
             this.showSessionDataError();
+            return;
+        }
+        
+        // Check if required functions are available
+        if (!window.performContainerSearch || !window.generatePalletLandDestinations) {
+            console.error('❌ Required functions not available yet for PalletLand');
+            progressText.textContent = 'Required functions not loaded. Please wait and try again.';
+            progressPercentage.textContent = 'Error';
+            setTimeout(() => {
+                refreshBtn.disabled = false;
+                exportBtn.disabled = false;
+            }, 1000);
             return;
         }
         
@@ -282,8 +294,14 @@ class PalletLandModule {
         try {
             progressText.textContent = `Scanning ${dropZoneId}...`;
             
+            // Add timeout to prevent hanging
+            const searchPromise = window.performContainerSearch(dropZoneId);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Search timeout')), 10000)
+            );
+            
             // Use deep scanning approach for accurate unit counts
-            const searchDetails = await window.performContainerSearch(dropZoneId);
+            const searchDetails = await Promise.race([searchPromise, timeoutPromise]);
             
             let totalPallets = 0;
             let totalUnits = 0;
@@ -318,6 +336,9 @@ class PalletLandModule {
                 
                 for (const pallet of searchDetails.childContainers) {
                     try {
+                        // Add delay to avoid overwhelming the API
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
                         // Get detailed contents of this pallet
                         const palletDetails = await window.performContainerSearch(pallet.containerId);
                         

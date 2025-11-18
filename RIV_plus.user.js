@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.8.0
+// @version      3.8.2
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -9,10 +9,10 @@
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
 // @grant        none
 // @run-at       document-start
-// @homepageURL  https://github.com/dariuszkubica/RIV+
-// @supportURL   https://github.com/dariuszkubica/RIV+/issues
-// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV+/main/RIV_plus.user.js
-// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV+/main/RIV_plus.user.js
+// @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
+// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
+// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV_plus.user.js
+// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV_plus.user.js
 // ==/UserScript==
 
 (function() {
@@ -21,7 +21,7 @@
     console.log('🚀 RIV+ script starting...');
     
     // Configuration
-    const SCRIPT_VERSION = '3.8.0';
+    const SCRIPT_VERSION = '3.8.2';
     const MODULE_BASE_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/src/';
     const FALLBACK_BASE_URL = 'https://cdn.jsdelivr.net/gh/dariuszkubica/RIV-ReloUp@main/src/';
     
@@ -431,10 +431,11 @@
     window.rivReloadModules = async function() {
         console.log('🔄 Reloading modules...');
         try {
-            // Clear cache
+            // Clear cache from all versions
             Object.keys(localStorage).forEach(key => {
                 if (key.startsWith('riv-module-')) {
                     localStorage.removeItem(key);
+                    console.log(`🗑️ Cleared cache: ${key}`);
                 }
             });
             
