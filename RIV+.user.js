@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.8
+// @version      3.9
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -140,48 +140,113 @@
     function getCurrentUser() {
         // Try multiple methods to get the actual logged-in user
         
-        // Method 1: Try to extract from page elements (user profile, header, etc.)
+        console.log('🔍 Attempting to detect current user from application...');
+        
+        // Method 1: Try to extract from cookies first (most reliable for Amazon systems)
         try {
-            // Look for user info in common UI elements
-            const userElements = document.querySelectorAll('[data-testid*="user"], [id*="user"], [class*="user"]');
-            for (const element of userElements) {
-                const text = element.textContent || element.innerText;
-                if (text && text.length > 2 && text.length < 20 && /^[a-zA-Z0-9]+$/.test(text)) {
-                    console.log('Found potential user from UI element:', text);
-                    return text;
+            const cookies = document.cookie;
+            console.log('🍪 Checking cookies for user info...');
+            
+            // Amazon systems often use these cookie patterns
+            const cookiePatterns = [
+                /fcmenu-employeeLogin=([^;]+)/,
+                /employee[-_]?login=([^;]+)/i,
+                /user[-_]?name?=([^;]+)/i,
+                /associate[-_]?id?=([^;]+)/i,
+                /login[-_]?id?=([^;]+)/i
+            ];
+            
+            for (const pattern of cookiePatterns) {
+                const match = cookies.match(pattern);
+                if (match && match[1]) {
+                    const user = decodeURIComponent(match[1]);
+                    if (user && user.length > 2 && user.length < 20 && /^[a-zA-Z0-9]+$/.test(user)) {
+                        console.log('✅ Found user from cookies:', user);
+                        return user;
+                    }
                 }
             }
+        } catch (e) {
+            console.warn('Error checking cookies:', e);
+        }
+        
+        // Method 2: Try to extract from page elements (user profile, header, etc.)
+        try {
+            console.log('🔍 Checking UI elements for user info...');
             
-            // Check for user info in meta tags
-            const metaTags = document.querySelectorAll('meta[name*="user"], meta[name*="employee"], meta[name*="login"]');
+            // Look for user info in common UI elements with broader selectors
+            const selectors = [
+                '[data-testid*="user"]', '[id*="user"]', '[class*="user"]',
+                '[data-testid*="employee"]', '[id*="employee"]', '[class*="employee"]',
+                '[data-testid*="login"]', '[id*="login"]', '[class*="login"]',
+                'header [class*="name"]', 'nav [class*="user"]',
+                '.user-info', '.employee-info', '.login-info'
+            ];
+            
+            for (const selector of selectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    for (const element of elements) {
+                        const text = (element.textContent || element.innerText || '').trim();
+                        if (text && text.length > 2 && text.length < 20 && /^[a-zA-Z0-9]+$/.test(text) && 
+                            !text.toLowerCase().includes('user') && !text.toLowerCase().includes('login')) {
+                            console.log('✅ Found potential user from UI element:', text, 'from', selector);
+                            return text;
+                        }
+                    }
+                } catch (e) {
+                    // Continue with next selector
+                }
+            }
+        } catch (e) {
+            console.warn('Error checking UI elements:', e);
+        }
+            
+        // Method 3: Check for user info in meta tags
+        try {
+            console.log('🔍 Checking meta tags...');
+            const metaTags = document.querySelectorAll('meta[name*="user"], meta[name*="employee"], meta[name*="login"], meta[name*="associate"]');
             for (const tag of metaTags) {
                 const content = tag.getAttribute('content');
                 if (content && content.length > 2 && content.length < 20 && /^[a-zA-Z0-9]+$/.test(content)) {
-                    console.log('Found potential user from meta tag:', content);
+                    console.log('✅ Found potential user from meta tag:', content);
                     return content;
                 }
             }
+        } catch (e) {
+            console.warn('Error checking meta tags:', e);
+        }
+        
+        // Method 4: Check localStorage for user data (more thorough)
+        try {
+            console.log('🔍 Checking localStorage...');
+            const storageKeys = Object.keys(localStorage);
             
-            // Check localStorage for user data
-            for (const key in localStorage) {
+            for (const key of storageKeys) {
                 try {
-                    if (key.toLowerCase().includes('user') || key.toLowerCase().includes('employee')) {
+                    if (key.toLowerCase().includes('user') || key.toLowerCase().includes('employee') || 
+                        key.toLowerCase().includes('login') || key.toLowerCase().includes('associate')) {
                         const value = localStorage.getItem(key);
+                        
                         if (value && !value.startsWith('{') && !value.startsWith('[')) {
                             // Simple string value
                             if (value.length > 2 && value.length < 20 && /^[a-zA-Z0-9]+$/.test(value)) {
-                                console.log('Found potential user from localStorage:', value);
+                                console.log('✅ Found potential user from localStorage key', key + ':', value);
                                 return value;
                             }
-                        } else {
+                        } else if (value) {
                             // Try to parse JSON
                             try {
                                 const parsed = JSON.parse(value);
-                                if (parsed.username || parsed.user || parsed.employee || parsed.login) {
-                                    const user = parsed.username || parsed.user || parsed.employee || parsed.login;
-                                    if (typeof user === 'string' && user.length > 2 && user.length < 20) {
-                                        console.log('Found user from localStorage JSON:', user);
-                                        return user;
+                                const userFields = ['username', 'user', 'employee', 'login', 'associate', 'employeeLogin', 'userLogin'];
+                                
+                                for (const field of userFields) {
+                                    if (parsed[field]) {
+                                        const user = parsed[field];
+                                        if (typeof user === 'string' && user.length > 2 && user.length < 20 && /^[a-zA-Z0-9]+$/.test(user)) {
+                                            console.log('✅ Found user from localStorage JSON:', user, 'from field', field);
+                                            return user;
+                                        }
                                     }
                                 }
                             } catch (e) {
@@ -193,41 +258,54 @@
                     // Continue with next key
                 }
             }
-            
-            // Check sessionStorage as well
-            for (const key in sessionStorage) {
-                try {
-                    if (key.toLowerCase().includes('user') || key.toLowerCase().includes('employee')) {
-                        const value = sessionStorage.getItem(key);
-                        if (value && !value.startsWith('{') && !value.startsWith('[')) {
-                            if (value.length > 2 && value.length < 20 && /^[a-zA-Z0-9]+$/.test(value)) {
-                                console.log('Found potential user from sessionStorage:', value);
-                                return value;
-                            }
-                        } else {
-                            try {
-                                const parsed = JSON.parse(value);
-                                if (parsed.username || parsed.user || parsed.employee || parsed.login) {
-                                    const user = parsed.username || parsed.user || parsed.employee || parsed.login;
-                                    if (typeof user === 'string' && user.length > 2 && user.length < 20) {
-                                        console.log('Found user from sessionStorage JSON:', user);
-                                        return user;
-                                    }
-                                }
-                            } catch (e) {
-                                // Ignore JSON parse errors
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // Continue with next key
-                }
-            }
-            
         } catch (e) {
-            console.warn('Error extracting current user:', e);
+            console.warn('Error checking localStorage:', e);
         }
         
+        // Method 5: Check sessionStorage as well
+        try {
+            console.log('🔍 Checking sessionStorage...');
+            const sessionKeys = Object.keys(sessionStorage);
+            
+            for (const key of sessionKeys) {
+                try {
+                    if (key.toLowerCase().includes('user') || key.toLowerCase().includes('employee') || 
+                        key.toLowerCase().includes('login') || key.toLowerCase().includes('associate')) {
+                        const value = sessionStorage.getItem(key);
+                        
+                        if (value && !value.startsWith('{') && !value.startsWith('[')) {
+                            if (value.length > 2 && value.length < 20 && /^[a-zA-Z0-9]+$/.test(value)) {
+                                console.log('✅ Found potential user from sessionStorage:', value);
+                                return value;
+                            }
+                        } else if (value) {
+                            try {
+                                const parsed = JSON.parse(value);
+                                const userFields = ['username', 'user', 'employee', 'login', 'associate', 'employeeLogin', 'userLogin'];
+                                
+                                for (const field of userFields) {
+                                    if (parsed[field]) {
+                                        const user = parsed[field];
+                                        if (typeof user === 'string' && user.length > 2 && user.length < 20 && /^[a-zA-Z0-9]+$/.test(user)) {
+                                            console.log('✅ Found user from sessionStorage JSON:', user, 'from field', field);
+                                            return user;
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                // Ignore JSON parse errors
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Continue with next key
+                }
+            }
+        } catch (e) {
+            console.warn('Error checking sessionStorage:', e);
+        }
+        
+        console.log('❌ Could not detect current user from application');
         return null;
     }
     
@@ -2292,7 +2370,6 @@
         }
     }
     
-
     // Automatically trigger session data capture at startup
     async function autoTriggerSessionCapture() {
         console.log('🚀 Auto-triggering session data capture at startup...');
@@ -2315,10 +2392,10 @@
             const scripts = document.querySelectorAll('script:not([src])');
             for (const script of scripts) {
                 const text = script.textContent;
-                if (text && text.includes('KTW1')) {
+                if (text && (text.includes('warehouseId') || text.includes('warehouse') || text.includes('associate') || text.includes('employee'))) {
                     // Look for warehouse patterns in embedded JavaScript
                     const warehouseMatches = text.match(/["']warehouseId["']\s*[:=]\s*["']([A-Z0-9]+)["']/g);
-                    const associateMatches = text.match(/["'](?:associate|employeeLogin|username)["']\s*[:=]\s*["']([A-Za-z0-9]+)["']/g);
+                    const associateMatches = text.match(/["'](?:associate|employeeLogin|username|user)["']\s*[:=]\s*["']([A-Za-z0-9]+)["']/g);
                     
                     if (warehouseMatches && warehouseMatches.length > 0) {
                         const match = warehouseMatches[0].match(/["']([A-Z0-9]+)["']$/);
@@ -2562,6 +2639,60 @@
         }
     }
     
+    // Global debug function for checking localStorage session data (accessible from console)
+    window.rivCheckStoredSession = function() {
+        console.log('🔍 Checking stored session data...');
+        
+        try {
+            const stored = localStorage.getItem('riv_session_data');
+            if (stored) {
+                const data = JSON.parse(stored);
+                console.log('📦 Found stored session data:', data);
+                
+                const lastCaptured = data.lastCaptured ? new Date(data.lastCaptured) : null;
+                const now = new Date();
+                const hoursSinceCapture = lastCaptured ? (now - lastCaptured) / (1000 * 60 * 60) : 'unknown';
+                
+                console.log('⏰ Time since capture:', hoursSinceCapture, 'hours');
+                console.log('📊 Current session state:', {
+                    warehouseId: sessionData.warehouseId,
+                    associate: sessionData.associate,
+                    sessionId: sessionData.sessionId,
+                    lastCaptured: sessionData.lastCaptured
+                });
+                
+                return data;
+            } else {
+                console.log('📭 No stored session data found');
+                return null;
+            }
+        } catch (e) {
+            console.error('❌ Error reading stored session data:', e);
+            return null;
+        }
+    };
+
+    // Global debug function for clearing stored session data (accessible from console)
+    window.rivClearStoredSession = function() {
+        console.log('🗑️ Clearing stored session data...');
+        
+        try {
+            localStorage.removeItem('riv_session_data');
+            sessionData.warehouseId = null;
+            sessionData.associate = null;
+            sessionData.sessionId = null;
+            sessionData.lastCaptured = null;
+            
+            console.log('✅ Stored session data cleared successfully');
+            console.log('ℹ️ Refresh the page or call rivTestSessionCapture() to capture new session data');
+            
+            return true;
+        } catch (e) {
+            console.error('❌ Error clearing session data:', e);
+            return false;
+        }
+    };
+
     // Global debug function for testing current user detection (accessible from console)
     window.rivTestCurrentUser = function() {
         console.log('🧪 Testing current user detection...');
@@ -2665,6 +2796,30 @@
             console.error('❌ Error updating from cookies:', error);
             return false;
         }
+    };
+
+    // Global debug function for detailed user detection testing (accessible from console)
+    window.rivTestUserDetection = function() {
+        console.log('=== DETAILED USER DETECTION TEST ===');
+        
+        console.log('🔍 Testing getCurrentUser() function...');
+        const user = getCurrentUser();
+        console.log('📝 getCurrentUser() result:', user);
+        
+        // Test script metadata
+        const metadata = SCRIPT_METADATA();
+        console.log('📝 Script metadata fallback:', metadata.author);
+        
+        console.log('\n=== SUMMARY ===');
+        console.log('🎯 Final detection result:', { 
+            detectedUser: user, 
+            scriptAuthor: metadata.author,
+            finalUser: user || metadata.author,
+            source: user ? 'detected from application' : 'fallback to script author'
+        });
+        console.log('=== END USER DETECTION TEST ===');
+        
+        return { detectedUser: user, scriptAuthor: metadata.author };
     };
     
     // Enhanced container search with silent mode option
@@ -4216,7 +4371,10 @@
         console.log('🔧 Debug functions available:');
         console.log('   - rivTestCurrentUser() - Test current user detection');
         console.log('   - rivTestSessionCapture() - Test automatic session capture');
-        console.log(`   - rivSetKnownSession() - Set session from current user or fallback`);
+        console.log('   - rivTestUserDetection() - Detailed user detection test with step-by-step output');
+        console.log('   - rivCheckStoredSession() - Check what is stored in localStorage');
+        console.log('   - rivClearStoredSession() - Clear stored session data');
+        console.log('   - rivSetKnownSession() - Set session from current user or fallback');
         console.log('   - rivUpdateFromCookies() - Try to update session from cookies (limited)');
     };
     
