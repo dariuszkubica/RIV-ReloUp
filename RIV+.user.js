@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.9.1
+// @version      3.9.2
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -521,20 +521,28 @@
                 const saved = localStorage.getItem('riv_session_data');
                 if (saved) {
                     const data = JSON.parse(saved);
-                    // Only restore if the data is relatively recent (within 24 hours)
+                    // Only restore if the data is relatively recent (within 24 hours) AND not using script author
                     const lastCaptured = data.lastCaptured ? new Date(data.lastCaptured) : null;
                     const now = new Date();
                     const dayInMs = 24 * 60 * 60 * 1000;
+                    const isValidAssociate = data.associate && 
+                                            data.associate !== 'System' && 
+                                            data.associate !== SCRIPT_METADATA.author && 
+                                            data.associate !== 'kubicdar'; // Extra safety check
                     
-                    if (lastCaptured && (now - lastCaptured) < dayInMs) {
+                    if (lastCaptured && (now - lastCaptured) < dayInMs && isValidAssociate) {
                         this.warehouseId = data.warehouseId;
                         this.associate = data.associate;
                         this.sessionId = data.sessionId;
                         this.lastCaptured = data.lastCaptured;
-                        console.log('📥 Session data restored from localStorage:', data);
+                        console.log('📥 Valid session data restored from localStorage:', data);
                         return true;
                     } else {
-                        console.log('📅 Stored session data is too old, ignoring');
+                        if (!isValidAssociate) {
+                            console.log('🚫 Stored session data contains script author/invalid associate, clearing');
+                        } else {
+                            console.log('📅 Stored session data is too old, ignoring');
+                        }
                         localStorage.removeItem('riv_session_data');
                     }
                 }
@@ -1397,46 +1405,10 @@
             if (e.target === overlay) closeDashboard(overlay);
         };
         
-        // Show session debug info
-        setTimeout(() => {
-            const debugInfo = document.createElement('div');
-            debugInfo.style.cssText = `
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                background: #f8f9fa;
-                border: 1px solid #dee2e6;
-                padding: 10px;
-                border-radius: 4px;
-                font-size: 12px;
-                z-index: 1000000;
-                max-width: 300px;
-            `;
-            
-            const hasValidSession = sessionData.warehouseId && sessionData.associate && 
-                                  sessionData.warehouseId !== 'CDPL1' && sessionData.associate !== 'System';
-            
-            debugInfo.innerHTML = `
-                <strong>🔧 Session Debug Info:</strong><br>
-                warehouseId: ${sessionData.warehouseId || 'Not captured'}<br>
-                associate: ${sessionData.associate || 'Not captured'}<br>
-                lastCaptured: ${sessionData.lastCaptured ? sessionData.lastCaptured.toLocaleString() : 'Never'}<br>
-                <strong style="color: ${hasValidSession ? '#28a745' : '#dc3545'};">Status: ${hasValidSession ? 'Valid ✅' : 'Invalid ❌'}</strong>
-            `;
-            overlay.appendChild(debugInfo);
-            
-            // Auto-remove after 15 seconds for session info
-            setTimeout(() => {
-                if (debugInfo.parentNode) {
-                    debugInfo.remove();
-                }
-            }, 15000);
-        }, 1000);
-        
         // Auto-start scan when dashboard opens
         setTimeout(() => {
             startDashboardScan();
-        }, 2000); // Longer delay to allow session capture
+        }, 2000); // Delay to allow session capture
     }
 
     function closeDashboard(overlay) {
@@ -2402,24 +2374,20 @@
         console.log('🚀 Auto-triggering session data capture at startup...');
         
         try {
-            // First check if we already have valid session data captured from real user interactions
-            const existingSession = loadSessionFromStorage();
-            if (existingSession && existingSession.warehouseId && existingSession.associate) {
-                const isRecentAndValid = existingSession.lastCaptured && 
-                                       (Date.now() - existingSession.lastCaptured < 60 * 60 * 1000) && // Less than 1 hour old
-                                       existingSession.warehouseId !== 'CDPL1' && 
-                                       existingSession.associate !== 'System' &&
-                                       existingSession.associate !== SCRIPT_METADATA.author; // Not script author fallback
+            console.log('🔍 Checking for existing valid session data...');
+            
+            // Check if we have valid session data that doesn't use script author
+            if (sessionData.warehouseId && sessionData.associate) {
+                const isValid = sessionData.warehouseId !== 'CDPL1' && 
+                               sessionData.associate !== 'System' &&
+                               sessionData.associate !== SCRIPT_METADATA.author &&
+                               sessionData.associate !== 'kubicdar'; // Extra safety
                 
-                if (isRecentAndValid) {
-                    console.log('✅ Found recent valid session data, skipping automatic capture:', {
-                        warehouseId: existingSession.warehouseId,
-                        associate: existingSession.associate,
-                        age: Math.round((Date.now() - existingSession.lastCaptured) / (1000 * 60)) + ' minutes ago'
+                if (isValid) {
+                    console.log('✅ Already have valid session data, skipping automatic capture:', {
+                        warehouseId: sessionData.warehouseId,
+                        associate: sessionData.associate
                     });
-                    
-                    // Update current session data from storage
-                    sessionData.update(existingSession.warehouseId, existingSession.associate);
                     return true;
                 }
             }
@@ -2471,26 +2439,15 @@
             }
             
             if (!associate) {
-                // Try to get current logged-in user from the application (after page load delay)
-                console.log('🔍 Attempting to detect current user from application...');
-                const currentUser = getCurrentUser();
-                if (currentUser) {
-                    associate = currentUser;
-                    console.log('✅ Found current user from application:', currentUser);
-                } else {
-                    // Before falling back to script author, try to wait for user interaction
-                    console.log('⚠️ Could not detect current user immediately');
-                    console.log('💡 Suggestion: Use manual search first to capture real user data');
-                    console.log('🚫 Skipping automatic capture to avoid using wrong user');
-                    
-                    // Don't make automatic request with script author - wait for real user data
-                    return false;
-                }
+                console.log('🚫 No associate found in page extraction - automatic capture disabled');
+                console.log('💡 Use manual search to capture real user session data');
+                console.log('ℹ️ This prevents using incorrect fallback user data');
+                return false;
             }
             
-            // Double-check that we're not using script author as associate
-            if (associate === SCRIPT_METADATA.author) {
-                console.log('🚫 Detected script author as associate - this is likely wrong');
+            // Verify associate is not script author or other invalid values
+            if (associate === SCRIPT_METADATA.author || associate === 'kubicdar' || associate === 'System') {
+                console.log('🚫 Associate contains script author or invalid value:', associate);
                 console.log('💡 Waiting for real user interaction to capture correct data');
                 return false;
             }
@@ -4317,12 +4274,17 @@
                 // Capture session data from real API requests
                 const requestData = JSON.parse(data);
                 if (requestData.warehouseId && requestData.associate) {
-                    // Only update if we get non-default values
-                    if (requestData.warehouseId !== 'CDPL1' && requestData.associate !== 'System') {
+                    // Only update if we get non-default values AND not script author
+                    const isValidData = requestData.warehouseId !== 'CDPL1' && 
+                                       requestData.associate !== 'System' &&
+                                       requestData.associate !== SCRIPT_METADATA.author &&
+                                       requestData.associate !== 'kubicdar'; // Extra protection
+                    
+                    if (isValidData) {
                         sessionData.update(requestData.warehouseId, requestData.associate);
                         console.log(`🔐 Valid session data captured: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
                     } else {
-                        console.warn(`🚫 Skipped default session data: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
+                        console.warn(`🚫 Skipped invalid session data: warehouseId=${requestData.warehouseId}, associate=${requestData.associate}`);
                     }
                 }
                 
@@ -4420,19 +4382,23 @@
                     }
                 });
             } else {
-                // If session was restored, still start periodic refresh and monitoring
-                startSessionRefresh();
+                // Session was restored from localStorage - verify it's still valid
+                const isRestoredSessionValid = sessionData.associate && 
+                                              sessionData.associate !== 'System' &&
+                                              sessionData.associate !== SCRIPT_METADATA.author &&
+                                              sessionData.associate !== 'kubicdar';
                 
-                // Try to update session data from cookies anyway (in case stored data is outdated)
-                setTimeout(() => {
-                    autoTriggerSessionCapture().then((success) => {
-                        if (success) {
-                            console.log('✅ Session data refreshed from cookies');
-                        }
-                    }).catch((error) => {
-                        console.log('ℹ️ Could not refresh session from cookies (using stored data)');
-                    });
-                }, 2000);
+                if (isRestoredSessionValid) {
+                    console.log('✅ Using valid restored session data');
+                    startSessionRefresh();
+                } else {
+                    console.log('⚠️ Restored session data is invalid, clearing and waiting for manual interaction');
+                    sessionData.warehouseId = null;
+                    sessionData.associate = null;
+                    sessionData.sessionId = null;
+                    sessionData.lastCaptured = null;
+                    localStorage.removeItem('riv_session_data');
+                }
             }
         }, 1000); // Reduced delay for faster startup
         
@@ -4441,9 +4407,9 @@
             checkForUpdates(); // Use new auto-update system
         }, 5000); // Check after 5 seconds
         
-        console.log('📄 RIV ReloUp ready - Enhanced user detection enabled');
-        console.log('ℹ️ Automatic session capture now waits for real user detection');
-        console.log('💡 Use manual search first if automatic capture fails');
+        console.log('📄 RIV ReloUp ready - Enhanced session management enabled');
+        console.log('🛡️ Automatic capture now prevents using script author as fallback');
+        console.log('💡 If session capture fails, use manual search to establish real user session');
         console.log('🔧 Debug functions available:');
         console.log('   - rivTestCurrentUser() - Test current user detection');
         console.log('   - rivTestSessionCapture() - Test automatic session capture');
