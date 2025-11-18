@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.8.2
+// @version      3.8.4
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -21,7 +21,7 @@
     console.log('🚀 RIV+ script starting...');
     
     // Configuration
-    const SCRIPT_VERSION = '3.8.2';
+    const SCRIPT_VERSION = '3.8.4';
     const MODULE_BASE_URL = 'https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/src/';
     const FALLBACK_BASE_URL = 'https://cdn.jsdelivr.net/gh/dariuszkubica/RIV-ReloUp@main/src/';
     
@@ -252,6 +252,7 @@
             // Make core functions globally accessible for backward compatibility
             window.sessionData = coreModule.sessionData;
             window.performContainerSearch = (containerId, silent) => coreModule.performContainerSearch(containerId, silent);
+            window.getMainDestination = (sortationCategory) => coreModule.getMainDestination(sortationCategory);
             window.scriptSettings = settingsModule.scriptSettings;
             window.generatePalletLandDestinations = () => settingsModule.generatePalletLandDestinations();
             window.generateDashboardDestinations = () => settingsModule.generateDashboardDestinations();
