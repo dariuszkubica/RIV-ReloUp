@@ -451,33 +451,24 @@
     
     // Category to Main Destination mapping
     const categoryDestinationMap = {
-        '2 - NON TECH TTA': 'BTS2',
-        '9 - SPECIALITY URGENT': 'BTS2',
-        '9 - SPECIALTY URGENT': 'BTS2',  // Alternative spelling
-        '7 - HRV URGENT': 'BTS2',
+        '6 - NON TECH TTA' : 'BTS2',
         '4 - FAST PROCESSING TTA': 'BTS2',
-        '5 - FAST PROCESSING TTA': 'BTS2',
-        '1 - TECH TTA': 'BTS2',
-        '1 - TECH TTA SIDELINE': 'BTS2',
-        '6 - NON TECH TTA': 'BTS2',
-        'PROBLEM SOLVE': 'KTW1',
-        '3 - APPAREL TTA': 'KTW1',
-        'APPAREL URGENT': 'KTW1',
-        '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
         'S&A FAST PROCESSING TTA': 'KTW1',
-        'SHOES URGENT': 'KTW1',
-        'BROKEN AND LEAKING': 'KTW1',
-        'SHARP': 'KTW1',
-        'BWS': 'KTW1',
+        'NON TECH TTA LCJ4' : 'LCJ4',
         'APPAREL SIDELINE': 'KTW1',
+        '1 - TECH TTA SIDELINE': 'BTS2',
+        '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
+        'TECH TTA LCJ4 SIDELINE': 'LCJ4',
+        'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
+        '7 - HRV URGENT': 'BTS2',
+        'SHOES URGENT': 'KTW1',
+        'APPAREL URGENT': 'KTW1',
         '8 - BMVD URGENT': 'LCJ4',
         'URGENT LCJ4': 'LCJ4',
-        'NON TECH TTA LCJ4': 'LCJ4',
-        '4 - LOW VALUE TTA': 'LCJ4',
-        'Tech TTA LCJ4': 'LCJ4',
-        'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
-        'TECH TTA LCJ4 SIDELINE': 'LCJ4',
-        '0 - NON-SORT': 'WRO1'
+
+        //OLD
+        '1 - TECH TTA' : 'BTS2',
+        'Tech TTA LCJ4' : 'LCJ4'
     };
     
     // Get main destination for category
