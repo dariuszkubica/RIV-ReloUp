@@ -9,10 +9,8 @@
 // @match        https://dub.prod.item-visibility.returns.amazon.dev/*
 // @grant        none
 // @run-at       document-start
-// @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
-// @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
-// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV+.user.js
-// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV+.user.js
+// @downloadURL  https://axzile.corp.amazon.com/-/carthamus/download_script/riv+.user.js
+// @updateURL    https://axzile.corp.amazon.com/-/carthamus/download_script/riv+.user.js
 // ==/UserScript==
 
 (function() {
