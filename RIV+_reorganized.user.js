@@ -952,6 +952,21 @@
                 return;
             }
 
+            // Make footer always visible at bottom while preserving original design
+            footer.style.cssText = `
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: baseline !important;
+                background-color: #00688D !important;
+                box-shadow: 0 -2px 8px rgba(0,0,0,0.15) !important;
+                margin: 0 !important;
+            `;
+
             // Check if we already added our menu items
             if (footer.querySelector('[data-riv-menu-item]')) {
                 return;
@@ -999,6 +1014,27 @@
                 </div>
             `;
 
+            // Search menu item
+            const searchItem = document.createElement('a');
+            searchItem.href = '#';
+            searchItem.setAttribute('data-riv-menu-item', 'search');
+            searchItem.onclick = function(e) {
+                e.preventDefault();
+                window.location.href = 'https://dub.prod.item-visibility.returns.amazon.dev/search';
+            };
+            searchItem.innerHTML = `
+                <div class="footer-item">
+                    <span class="css-1ox0ukt">
+                        <span aria-label="" role="img" aria-hidden="true" class="css-34iy07">
+                            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z" fill="currentColor"/>
+                            </svg>
+                        </span>
+                    </span>
+                    <p class="css-1fz4hyd" mdn-text="">Search</p>
+                </div>
+            `;
+
             // Settings menu item
             const settingsItem = document.createElement('a');
             settingsItem.href = '#';
@@ -1021,6 +1057,7 @@
             `;
 
             // Add items to footer
+            footer.appendChild(searchItem);
             footer.appendChild(dashboardItem);
             footer.appendChild(palletlandItem);
             footer.appendChild(settingsItem);
@@ -2578,6 +2615,1287 @@
     };
     
     // ========================================================================
+    // SEARCH MODULE - Enhanced search functionality with advanced deep scan
+    // ========================================================================
+    
+    /**
+     * Search Module - Dedicated search functionality for the Search page
+     */
+    const SearchModule = {
+        
+        // Enhanced deep scan specifically for Search page usage
+        performAdvancedDeepScan: async function(containerId, progressCallback = null) {
+            console.log(`🔍 Starting advanced deep scan for: ${containerId}`);
+            
+            try {
+                // Get main container information
+                const mainContainer = await Core.performContainerSearch(containerId);
+                if (!mainContainer || !mainContainer.childContainers) {
+                    throw new Error('Container not found or has no child containers');
+                }
+                
+                const results = {
+                    containerId: containerId,
+                    containerInfo: mainContainer,
+                    totalPallets: mainContainer.childContainers.length,
+                    totalUnits: 0,
+                    totalTotes: 0,
+                    sortationCategories: new Map(),
+                    destinationMapping: new Map(),
+                    palletDetails: [],
+                    allCDDDates: [], // Store all Clean Decant Dates
+                    oldestCDD: null, // Will store the oldest CDD
+                    scanTimestamp: new Date(),
+                    scanDuration: 0
+                };
+                
+                const startTime = Date.now();
+                
+                if (progressCallback) {
+                    progressCallback(`Scanning ${results.totalPallets} pallets...`, 0);
+                }
+                
+                // Deep scan each pallet with enhanced data collection
+                for (let i = 0; i < mainContainer.childContainers.length; i++) {
+                    const pallet = mainContainer.childContainers[i];
+                    
+                    try {
+                        if (progressCallback) {
+                            const progress = ((i + 1) / mainContainer.childContainers.length) * 100;
+                            progressCallback(`Deep scanning pallet ${i + 1}/${mainContainer.childContainers.length}: ${pallet.containerId}`, progress);
+                        }
+                        
+                        // Get detailed pallet information
+                        const palletData = await Core.performContainerSearch(pallet.containerId, true);
+                        
+                        if (palletData && palletData.childContainers && Array.isArray(palletData.childContainers)) {
+                            const toteCount = palletData.childContainers.length;
+                            let palletUnits = 0;
+                            let toteDetails = [];
+                            
+                            // Analyze each tote in the pallet
+                            for (const tote of palletData.childContainers) {
+                                const toteUnits = tote.numOfChildContainers || 0;
+                                palletUnits += toteUnits;
+                                
+                                // Extract CDD from tote container properties (basic scan)
+                                let toteCDD = null;
+                                if (tote.containerProperties && tote.containerProperties.cleanDecantDate) {
+                                    toteCDD = tote.containerProperties.cleanDecantDate;
+                                    results.allCDDDates.push({
+                                        date: toteCDD,
+                                        toteId: tote.containerId,
+                                        palletId: pallet.containerId,
+                                        units: toteUnits,
+                                        sortationCategory: tote.sortationCategory || 'N/A',
+                                        destination: tote.destinationId || 'N/A',
+                                        source: 'tote'
+                                    });
+                                }
+                                
+                                toteDetails.push({
+                                    toteId: tote.containerId,
+                                    units: toteUnits,
+                                    sortationCategory: (tote.sortationCategories && tote.sortationCategories.length > 0) ? tote.sortationCategories[0] : (tote.sortationCategory || 'N/A'),
+                                    destination: tote.destinationId || 'N/A',
+                                    status: tote.status || 'N/A',
+                                    cdd: toteCDD || 'N/A'
+                                });
+                                
+                                // Track sortation categories
+                                if (tote.sortationCategories && Array.isArray(tote.sortationCategories)) {
+                                    tote.sortationCategories.forEach(cat => {
+                                        if (cat && cat !== 'N/A' && cat !== 'Empty') {
+                                            results.sortationCategories.set(cat, (results.sortationCategories.get(cat) || 0) + toteUnits);
+                                        }
+                                    });
+                                } else if (tote.sortationCategory && tote.sortationCategory !== 'N/A' && tote.sortationCategory !== 'Empty') {
+                                    results.sortationCategories.set(tote.sortationCategory, (results.sortationCategories.get(tote.sortationCategory) || 0) + toteUnits);
+                                }
+                                
+                                // Track destinations
+                                if (tote.destinationId && tote.destinationId !== 'N/A') {
+                                    const destination = CategoryMapper.getDestination(tote.destinationId);
+                                    results.destinationMapping.set(destination, (results.destinationMapping.get(destination) || 0) + toteUnits);
+                                }
+                            }
+                            
+                            results.totalUnits += palletUnits;
+                            results.totalTotes += toteCount;
+                            
+                            // Store detailed pallet information
+                            results.palletDetails.push({
+                                palletId: pallet.containerId,
+                                palletType: pallet.containerType || 'N/A',
+                                toteCount: toteCount,
+                                unitCount: palletUnits,
+                                sortationCategory: pallet.sortationCategory || 'N/A',
+                                destination: pallet.destinationId || 'N/A',
+                                status: pallet.status || 'N/A',
+                                location: pallet.currentLocation || 'N/A',
+                                lastModified: pallet.modifiedDate || null,
+                                totes: toteDetails
+                            });
+                            
+                            console.log(`📦 Deep scan ${pallet.containerId}: ${toteCount} totes, ${palletUnits} units`);
+                            
+                        } else {
+                            // Fallback for pallets without detailed data
+                            const fallbackUnits = pallet.numOfChildContainers || 0;
+                            results.totalUnits += fallbackUnits;
+                            
+                            results.palletDetails.push({
+                                palletId: pallet.containerId,
+                                palletType: pallet.containerType || 'N/A',
+                                toteCount: 0,
+                                unitCount: fallbackUnits,
+                                sortationCategory: pallet.sortationCategory || 'N/A',
+                                destination: pallet.destinationId || 'N/A',
+                                status: pallet.status || 'N/A',
+                                location: pallet.currentLocation || 'N/A',
+                                lastModified: pallet.modifiedDate || null,
+                                totes: [],
+                                note: 'Limited data available'
+                            });
+                        }
+                        
+                        // Small delay to prevent overwhelming the API
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (palletError) {
+                        console.warn(`⚠️ Error scanning pallet ${pallet.containerId}:`, palletError.message);
+                        
+                        // Add failed pallet to results with error info
+                        results.palletDetails.push({
+                            palletId: pallet.containerId,
+                            palletType: pallet.containerType || 'N/A',
+                            toteCount: 0,
+                            unitCount: 0,
+                            sortationCategory: 'Error',
+                            destination: 'Error',
+                            status: 'Scan Failed',
+                            location: pallet.currentLocation || 'N/A',
+                            lastModified: pallet.modifiedDate || null,
+                            totes: [],
+                            error: palletError.message
+                        });
+                    }
+                }
+                
+                // Find oldest CDD date with verification
+                if (results.allCDDDates.length > 0) {
+                    console.log(`🔍 Processing ${results.allCDDDates.length} CDD entries:`, results.allCDDDates.slice(0, 3));
+                    const verifiedCDDEntry = await this.findAndVerifyOldestCDD(results.allCDDDates);
+                    results.oldestCDD = verifiedCDDEntry ? verifiedCDDEntry.date : null;
+                    results.oldestCDDDetails = verifiedCDDEntry;
+                    console.log(`🔍 Final verified oldest CDD:`, results.oldestCDD);
+                } else {
+                    console.log(`⚠️ No CDD dates found in scan results`);
+                    results.oldestCDD = null;
+                    results.oldestCDDDetails = null;
+                }
+                
+                results.scanDuration = Date.now() - startTime;
+                
+                console.log(`✅ Advanced deep scan completed for ${containerId}:`, {
+                    pallets: results.totalPallets,
+                    totes: results.totalTotes,
+                    units: results.totalUnits,
+                    categories: results.sortationCategories.size,
+                    destinations: results.destinationMapping.size,
+                    duration: `${(results.scanDuration / 1000).toFixed(1)}s`
+                });
+                
+                return results;
+                
+            } catch (error) {
+                console.error(`❌ Advanced deep scan failed for ${containerId}:`, error);
+                throw error;
+            }
+        },
+        
+        // Export advanced scan results to detailed CSV
+        exportAdvancedScanResults: function(scanResults) {
+            if (!scanResults || !scanResults.palletDetails || scanResults.palletDetails.length === 0) {
+                alert('No scan data to export. Please perform an advanced deep scan first.');
+                return;
+            }
+            
+            // Create comprehensive CSV with multiple sheets worth of data
+            const timestamp = new Date().toISOString().split('T')[0];
+            const csvData = [];
+            
+            // Header
+            csvData.push([
+                'Container ID',
+                'Pallet ID', 
+                'Pallet Type',
+                'Tote Count',
+                'Unit Count',
+                'Sortation Category',
+                'Destination',
+                'Status',
+                'Location',
+                'Last Modified',
+                'Tote ID',
+                'Tote Units',
+                'Tote Category',
+                'Tote Destination',
+                'Tote Status',
+                'Scan Notes'
+            ].join(','));
+            
+            // Data rows - one row per tote, with pallet info repeated
+            scanResults.palletDetails.forEach(pallet => {
+                if (pallet.totes && pallet.totes.length > 0) {
+                    // One row per tote
+                    pallet.totes.forEach(tote => {
+                        csvData.push([
+                            scanResults.containerId,
+                            pallet.palletId,
+                            pallet.palletType,
+                            pallet.toteCount,
+                            pallet.unitCount,
+                            `"${pallet.sortationCategory}"`,
+                            `"${pallet.destination}"`,
+                            pallet.status,
+                            `"${pallet.location}"`,
+                            pallet.lastModified || '',
+                            tote.toteId,
+                            tote.units,
+                            `"${tote.sortationCategory}"`,
+                            `"${tote.destination}"`,
+                            tote.status,
+                            pallet.note || pallet.error || ''
+                        ].join(','));
+                    });
+                } else {
+                    // Pallet without tote details
+                    csvData.push([
+                        scanResults.containerId,
+                        pallet.palletId,
+                        pallet.palletType,
+                        pallet.toteCount,
+                        pallet.unitCount,
+                        `"${pallet.sortationCategory}"`,
+                        `"${pallet.destination}"`,
+                        pallet.status,
+                        `"${pallet.location}"`,
+                        pallet.lastModified || '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        pallet.note || pallet.error || ''
+                    ].join(','));
+                }
+            });
+            
+            // Create and download file
+            const csvContent = csvData.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `advanced-deep-scan-${scanResults.containerId}-${timestamp}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            console.log('✅ Advanced deep scan CSV exported successfully');
+        },
+        
+        // Find the oldest CDD date from array of date strings
+        findOldestCDD: function(cddData) {
+            console.log(`🔍 findOldestCDD called with ${cddData ? cddData.length : 0} CDD entries:`, cddData?.slice(0, 3));
+            
+            if (!cddData || cddData.length === 0) {
+                console.log(`⚠️ findOldestCDD: No CDD data provided`);
+                return null;
+            }
+            
+            // Sort all CDD entries by date (oldest first)
+            const sortedEntries = [];
+            let processedCount = 0;
+            let errorCount = 0;
+            
+            cddData.forEach((entry, index) => {
+                try {
+                    const dateStr = entry.date;
+                    const parts = dateStr.split(' ');
+                    if (parts.length >= 1) {
+                        const datePart = parts[0];
+                        const timePart = parts[1] || '00:00';
+                        
+                        // Convert DD-MM-YYYY to YYYY-MM-DD for proper parsing
+                        const dateComponents = datePart.split('-');
+                        if (dateComponents.length === 3) {
+                            const day = dateComponents[0];
+                            const month = dateComponents[1];
+                            const year = dateComponents[2];
+                            
+                            const formattedDate = `${year}-${month}-${day}T${timePart}`;
+                            const timestamp = new Date(formattedDate).getTime();
+                            
+                            if (!isNaN(timestamp)) {
+                                processedCount++;
+                                sortedEntries.push({
+                                    ...entry,
+                                    timestamp: timestamp
+                                });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.warn('Error parsing CDD date:', entry, error);
+                }
+            });
+            
+            // Sort by timestamp (oldest first)
+            sortedEntries.sort((a, b) => a.timestamp - b.timestamp);
+            
+            console.log(`📊 Sorted ${sortedEntries.length} CDD entries by date (oldest first)`);
+            
+            // Now check each entry starting from oldest to see if it exists in visible table
+            for (let i = 0; i < sortedEntries.length; i++) {
+                const candidateEntry = sortedEntries[i];
+                const isVisible = this.checkCDDVisibleInTable(candidateEntry.date, candidateEntry.toteId);
+                
+                console.log(`🔍 Checking CDD candidate ${i + 1}/${sortedEntries.length}: ${candidateEntry.date} (Tote: ${candidateEntry.toteId}) - Visible: ${isVisible}`);
+                
+                if (isVisible) {
+                    console.log(`✅ Found matching visible CDD:`, {
+                        date: candidateEntry.date,
+                        toteId: candidateEntry.toteId,
+                        palletId: candidateEntry.palletId,
+                        units: candidateEntry.units,
+                        sortationCategory: candidateEntry.sortationCategory,
+                        destination: candidateEntry.destination,
+                        position: `${i + 1} of ${sortedEntries.length} sorted entries`
+                    });
+                    
+                    // Enhanced console output
+                    console.log(`🎯 VERIFIED OLDEST CDD DETAILS (matches visible table):
+                    📅 Date: ${candidateEntry.date}
+                    📦 Tote ID: ${candidateEntry.toteId}
+                    🚛 Pallet ID: ${candidateEntry.palletId}
+                    📊 Units: ${candidateEntry.units}
+                    🏷️ Category: ${candidateEntry.sortationCategory}
+                    🎯 Destination: ${candidateEntry.destination}
+                    ⚡ Position in sorted list: ${i + 1}/${sortedEntries.length}`);
+                    
+                    return candidateEntry;
+                }
+            }
+            
+            // If no visible CDD found, return the oldest anyway but with warning
+            if (sortedEntries.length > 0) {
+                const oldestEntry = sortedEntries[0];
+                console.warn(`⚠️ No visible CDD found in table! Using oldest from data: ${oldestEntry.date} (Tote: ${oldestEntry.toteId})`);
+                console.log(`🔍 This suggests the visible table doesn't show all totes or there's a data mismatch.`);
+                return oldestEntry;
+            }
+            
+            console.log(`❌ No valid CDD found (processed: ${processedCount}, errors: ${errorCount})`);
+            return null;
+        },
+        
+        // Check if a specific CDD date and tote ID is visible in the current table
+        checkCDDVisibleInTable: function(cddDate, toteId) {
+            try {
+                // Look for tables that might contain LPN/CDD information
+                const tables = document.querySelectorAll('table');
+                
+                for (const table of tables) {
+                    // Skip our own RIV enhanced tables
+                    if (table.closest('[style*="position: fixed"]') || 
+                        table.closest('[id*="riv"]') || 
+                        table.closest('[id*="modal"]')) {
+                        continue;
+                    }
+                    
+                    const rows = table.querySelectorAll('tr');
+                    
+                    for (const row of rows) {
+                        const cells = row.querySelectorAll('td, th');
+                        const rowText = Array.from(cells).map(cell => cell.textContent.trim()).join(' ');
+                        
+                        // Check if this row contains our tote ID or CDD date
+                        const containsToteId = rowText.includes(toteId);
+                        const containsCDD = rowText.includes(cddDate.split(' ')[0]); // Check date part
+                        
+                        if (containsToteId || containsCDD) {
+                            console.log(`🔍 Found potential match in table row:`, rowText);
+                            
+                            // More precise check - look for CDD column specifically
+                            for (const cell of cells) {
+                                const cellText = cell.textContent.trim();
+                                
+                                // Check for exact CDD match (with or without time)
+                                if (cellText.includes(cddDate) || 
+                                    cellText.includes(cddDate.split(' ')[0])) {
+                                    console.log(`✅ Exact CDD match found in cell: "${cellText}"`);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return false;
+            } catch (error) {
+                console.warn('Error checking CDD visibility:', error);
+                return false; // If error, assume not visible to be safe
+            }
+        },
+        
+        // Verify CDD by deep scanning specific tote for items with potentially older CDD
+        verifyTotelCDD: async function(currentOldestEntry) {
+            try {
+                console.log(`🔍 Deep verification: scanning tote ${currentOldestEntry.toteId} for items to verify CDD ${currentOldestEntry.date}`);
+                
+                // Get detailed information about items inside this tote
+                const toteDetails = await Core.performContainerSearch(currentOldestEntry.toteId, true);
+                
+                if (!toteDetails || !toteDetails.childContainers || !Array.isArray(toteDetails.childContainers)) {
+                    console.log(`⚠️ No child containers found in tote ${currentOldestEntry.toteId}`);
+                    return currentOldestEntry; // Return original if no deeper data
+                }
+                
+                console.log(`📦 Found ${toteDetails.childContainers.length} items in tote ${currentOldestEntry.toteId}`);
+                
+                let foundMatchingCDD = false;
+                let actualOldestEntry = null;
+                let actualOldestTimestamp = null;
+                
+                // Check each item (LPN) inside the tote
+                toteDetails.childContainers.forEach(item => {
+                    if (item.containerProperties && item.containerProperties.cleanDecantDate) {
+                        const itemCDD = item.containerProperties.cleanDecantDate;
+                        const itemTimestamp = this.parseTimestamp(itemCDD);
+                        
+                        console.log(`🔍 Item ${item.containerId}: CDD ${itemCDD}`);
+                        
+                        // Check if this matches our tote-level CDD
+                        if (itemCDD === currentOldestEntry.date) {
+                            foundMatchingCDD = true;
+                            console.log(`✅ Found matching CDD in item: ${item.containerId} - ${itemCDD}`);
+                        }
+                        
+                        // Also track the actual oldest item CDD
+                        if (itemTimestamp && (actualOldestTimestamp === null || itemTimestamp < actualOldestTimestamp)) {
+                            actualOldestTimestamp = itemTimestamp;
+                            actualOldestEntry = {
+                                date: itemCDD,
+                                toteId: currentOldestEntry.toteId,
+                                itemId: item.containerId, // LPN ID
+                                palletId: currentOldestEntry.palletId,
+                                units: 1, // Each item is 1 unit
+                                sortationCategory: item.sortationCategory || currentOldestEntry.sortationCategory,
+                                destination: item.destinationId || currentOldestEntry.destination,
+                                source: 'item-verified',
+                                asin: item.containerProperties?.Asin || 'N/A',
+                                rmaId: item.containerProperties?.RMAId || 'N/A'
+                            };
+                        }
+                    }
+                });
+                
+                // Decision logic
+                if (foundMatchingCDD) {
+                    console.log(`✅ VERIFIED: Tote CDD ${currentOldestEntry.date} matches item CDD - using tote-level CDD`);
+                    return {
+                        ...currentOldestEntry,
+                        verified: true
+                    };
+                } else if (actualOldestEntry) {
+                    console.log(`🔄 MISMATCH: Tote CDD ${currentOldestEntry.date} not found in items. Verification failed.`);
+                    console.log(`📋 Verification details:`, {
+                        toteCDD: currentOldestEntry.date,
+                        actualOldestItemCDD: actualOldestEntry.date,
+                        itemId: actualOldestEntry.itemId,
+                        verified: false
+                    });
+                    return {
+                        ...currentOldestEntry,
+                        verified: false
+                    };
+                } else {
+                    console.log(`⚠️ No CDD found in items, verification failed`);
+                    return {
+                        ...currentOldestEntry,
+                        verified: false
+                    };
+                }
+                
+            } catch (error) {
+                console.error(`❌ Error in deep CDD verification for tote ${currentOldestEntry.toteId}:`, error);
+                return currentOldestEntry; // Return original on error
+            }
+        },
+        
+        // Helper function to parse timestamp from date string
+        parseTimestamp: function(dateStr) {
+            try {
+                if (!dateStr) return null;
+                
+                const parts = dateStr.split(' ');
+                if (parts.length >= 1) {
+                    const datePart = parts[0];
+                    const timePart = parts[1] || '00:00';
+                    
+                    // Convert DD-MM-YYYY to YYYY-MM-DD for proper parsing
+                    const dateComponents = datePart.split('-');
+                    if (dateComponents.length === 3) {
+                        const day = dateComponents[0];
+                        const month = dateComponents[1];
+                        const year = dateComponents[2];
+                        
+                        const formattedDate = `${year}-${month}-${day}T${timePart}`;
+                        const timestamp = new Date(formattedDate).getTime();
+                        
+                        return isNaN(timestamp) ? null : timestamp;
+                    }
+                }
+                return null;
+            } catch (error) {
+                console.warn('Error parsing timestamp:', dateStr, error);
+                return null;
+            }
+        },
+        
+        // Find and verify oldest CDD by iterating through sorted candidates
+        findAndVerifyOldestCDD: async function(cddData) {
+            console.log(`🔍 findAndVerifyOldestCDD called with ${cddData ? cddData.length : 0} CDD entries`);
+            
+            if (!cddData || cddData.length === 0) {
+                console.log(`⚠️ No CDD data provided`);
+                return null;
+            }
+            
+            // First, sort all entries by date (oldest first)
+            const sortedCandidates = this.sortCDDEntries(cddData);
+            console.log(`📊 Sorted ${sortedCandidates.length} CDD entries by date (oldest first)`);
+            
+            // Now iterate through candidates and verify each one
+            for (let i = 0; i < sortedCandidates.length; i++) {
+                const candidate = sortedCandidates[i];
+                console.log(`🔍 Testing candidate ${i + 1}/${sortedCandidates.length}: ${candidate.date} (Tote: ${candidate.toteId})`);
+                
+                // Perform deep verification for this candidate
+                const verificationResult = await this.verifyTotelCDD(candidate);
+                
+                // Check if the verification was successful (CDD matches)
+                if (verificationResult && verificationResult.verified === true) {
+                    console.log(`✅ VERIFIED MATCH FOUND at position ${i + 1}:`, {
+                        date: verificationResult.date,
+                        toteId: verificationResult.toteId,
+                        itemId: verificationResult.itemId,
+                        position: `${i + 1} of ${sortedCandidates.length}`
+                    });
+                    
+                    console.log(`🎯 FINAL VERIFIED OLDEST CDD:
+                    📅 Date: ${verificationResult.date}
+                    🎨 Formatted: ${this.formatCDDDate(verificationResult.date)}
+                    📦 Tote ID: ${verificationResult.toteId}
+                    🏷️ Item ID: ${verificationResult.itemId || 'N/A'}
+                    🚛 Pallet ID: ${verificationResult.palletId}
+                    ⚡ Verified at position: ${i + 1}/${sortedCandidates.length}`);
+                    
+                    return verificationResult;
+                }
+                
+                console.log(`❌ Candidate ${i + 1} failed verification, trying next...`);
+            }
+            
+            // If no candidate was verified, return the oldest one anyway with warning
+            if (sortedCandidates.length > 0) {
+                const fallback = sortedCandidates[0];
+                console.warn(`⚠️ No CDD candidate could be verified! Using oldest unverified: ${fallback.date} (Tote: ${fallback.toteId})`);
+                fallback.verified = false;
+                return fallback;
+            }
+            
+            console.log(`❌ No valid CDD candidates found`);
+            return null;
+        },
+        
+        // Helper function to sort CDD entries by date
+        sortCDDEntries: function(cddData) {
+            const sortedEntries = [];
+            
+            cddData.forEach(entry => {
+                const timestamp = this.parseTimestamp(entry.date);
+                if (timestamp) {
+                    sortedEntries.push({
+                        ...entry,
+                        timestamp: timestamp
+                    });
+                }
+            });
+            
+            // Sort by timestamp (oldest first)
+            sortedEntries.sort((a, b) => a.timestamp - b.timestamp);
+            return sortedEntries;
+        },
+        
+        // Convert CDD date format from "DD-MM-YYYY HH:MM" to "Wed 07 May 02:07"
+        formatCDDDate: function(dateStr) {
+            try {
+                if (!dateStr) return 'No CDD';
+                
+                const parts = dateStr.split(' ');
+                if (parts.length >= 1) {
+                    const datePart = parts[0];
+                    const timePart = parts[1] || '00:00';
+                    
+                    // Convert DD-MM-YYYY to proper date
+                    const dateComponents = datePart.split('-');
+                    if (dateComponents.length === 3) {
+                        const day = dateComponents[0];
+                        const month = dateComponents[1];
+                        const year = dateComponents[2];
+                        
+                        // Create proper date string for parsing: YYYY-MM-DD
+                        const properDateStr = `${year}-${month}-${day}T${timePart}`;
+                        const date = new Date(properDateStr);
+                        
+                        if (!isNaN(date.getTime())) {
+                            // Format as "Wed 07 May 02:07"
+                            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            
+                            const dayName = dayNames[date.getDay()];
+                            const dayNum = String(date.getDate()).padStart(2, '0');
+                            const monthName = monthNames[date.getMonth()];
+                            const timeFormatted = timePart;
+                            
+                            return `${dayName} ${dayNum} ${monthName} ${timeFormatted}`;
+                        }
+                    }
+                }
+                
+                // Fallback to original if parsing fails
+                console.warn('Could not format CDD date:', dateStr);
+                return dateStr;
+                
+            } catch (error) {
+                console.warn('Error formatting CDD date:', dateStr, error);
+                return dateStr;
+            }
+        },
+        
+        // Clean category name by removing number prefix and dash
+        cleanCategoryName: function(categoryName) {
+            if (!categoryName || categoryName === 'Unknown' || categoryName === 'N/A') {
+                return 'Unknown';
+            }
+            
+            // Remove pattern like "3 - " from the beginning
+            const cleaned = categoryName.replace(/^\d+\s*-\s*/, '').trim();
+            return cleaned || categoryName; // Return original if cleaning failed
+        },
+        
+        // Generate detailed description with destination breakdown
+        generateDescription: function(scanResults, containerId) {
+            try {
+                if (!scanResults || !scanResults.palletDetails) {
+                    return 'No data available';
+                }
+                
+                let description = '';
+                
+                // Group by cleaned category names from item level (totes)
+                const destinationStats = new Map();
+                
+                scanResults.palletDetails.forEach(pallet => {
+                    // Process each tote in the pallet to get item-level categories
+                    if (pallet.totes && pallet.totes.length > 0) {
+                        // Case 1: We have detailed tote data with items inside
+                        pallet.totes.forEach(tote => {
+                            // Get sortation category from tote (item level)
+                            let category = 'Unknown';
+                            if (tote.sortationCategory && tote.sortationCategory !== 'N/A') {
+                                category = this.cleanCategoryName(tote.sortationCategory);
+                            }
+                            
+                            // If still unknown, try destination as fallback
+                            if (category === 'Unknown' && tote.destination && tote.destination !== 'N/A') {
+                                category = tote.destination;
+                            }
+                            
+                            console.log(`📦 Tote ${tote.toteId}: category="${category}", raw sortationCategory="${tote.sortationCategory}", units=${tote.units}`);
+                            
+                            if (!destinationStats.has(category)) {
+                                destinationStats.set(category, { pallets: 0, units: 0 });
+                            }
+                            
+                            const stats = destinationStats.get(category);
+                            stats.units += tote.units || 0;
+                        });
+                        
+                        // Count this pallet for the dominant category
+                        if (pallet.totes.length > 0) {
+                            // Find the dominant category in this pallet (by units)
+                            const palletCategoryStats = new Map();
+                            pallet.totes.forEach(tote => {
+                                let category = 'Unknown';
+                                if (tote.sortationCategory && tote.sortationCategory !== 'N/A') {
+                                    category = this.cleanCategoryName(tote.sortationCategory);
+                                } else if (tote.destination && tote.destination !== 'N/A') {
+                                    category = tote.destination;
+                                }
+                                
+                                if (!palletCategoryStats.has(category)) {
+                                    palletCategoryStats.set(category, 0);
+                                }
+                                palletCategoryStats.set(category, palletCategoryStats.get(category) + (tote.units || 0));
+                            });
+                            
+                            // Find category with most units in this pallet
+                            let dominantCategory = 'Unknown';
+                            let maxUnits = 0;
+                            for (const [cat, units] of palletCategoryStats.entries()) {
+                                if (units > maxUnits) {
+                                    maxUnits = units;
+                                    dominantCategory = cat;
+                                }
+                            }
+                            
+                            // Add pallet count to dominant category
+                            if (destinationStats.has(dominantCategory)) {
+                                destinationStats.get(dominantCategory).pallets += 1;
+                            }
+                            
+                            console.log(`🚛 Pallet ${pallet.palletId}: dominant category="${dominantCategory}" (${maxUnits} units)`);
+                        }
+                    } else {
+                        // Case 2: We only have basic pallet data, use pallet-level or tote-level categories
+                        let category = 'Unknown';
+                        let totalUnits = 0;
+                        
+                        // Try to get category from pallet level first
+                        if (pallet.sortationCategory && pallet.sortationCategory !== 'N/A') {
+                            category = this.cleanCategoryName(pallet.sortationCategory);
+                            totalUnits = pallet.unitCount || 0;
+                        }
+                        // Use the raw pallet data from the scan results to get tote categories
+                        else {
+                            // Find corresponding raw pallet data in scanResults
+                            const rawPalletData = scanResults.containerInfo?.childContainers?.find(p => p.containerId === pallet.palletId);
+                            if (rawPalletData && rawPalletData.childContainers && rawPalletData.childContainers.length > 0) {
+                                console.log(`🔍 Found raw pallet data for ${pallet.palletId} with ${rawPalletData.childContainers.length} totes`);
+                                
+                                // Collect all categories and units from totes
+                                const categoryCounts = new Map();
+                                let palletTotalUnits = 0;
+                                
+                                rawPalletData.childContainers.forEach(tote => {
+                                    const toteUnits = tote.numOfChildContainers || 0;
+                                    palletTotalUnits += toteUnits;
+                                    
+                                    // Get category from sortationCategories array
+                                    if (tote.sortationCategories && Array.isArray(tote.sortationCategories) && tote.sortationCategories.length > 0) {
+                                        const rawCategory = tote.sortationCategories[0]; // Use first category
+                                        const cleanedCategory = this.cleanCategoryName(rawCategory);
+                                        
+                                        if (!categoryCounts.has(cleanedCategory)) {
+                                            categoryCounts.set(cleanedCategory, 0);
+                                        }
+                                        categoryCounts.set(cleanedCategory, categoryCounts.get(cleanedCategory) + toteUnits);
+                                        
+                                        console.log(`📦 Tote ${tote.containerId}: rawCategory="${rawCategory}", cleanedCategory="${cleanedCategory}", units=${toteUnits}`);
+                                    }
+                                });
+                                
+                                // Find dominant category (most units)
+                                let dominantCategory = 'Unknown';
+                                let maxUnits = 0;
+                                for (const [cat, units] of categoryCounts.entries()) {
+                                    if (units > maxUnits) {
+                                        maxUnits = units;
+                                        dominantCategory = cat;
+                                    }
+                                }
+                                
+                                category = dominantCategory;
+                                totalUnits = palletTotalUnits;
+                                
+                                console.log(`🚛 Pallet ${pallet.palletId}: dominant category="${dominantCategory}" from ${categoryCounts.size} categories, total units=${totalUnits}`);
+                                console.log(`📊 Category breakdown:`, Array.from(categoryCounts.entries()));
+                            } else {
+                                console.warn(`⚠️ No raw pallet data found for ${pallet.palletId}`);
+                                totalUnits = pallet.unitCount || 0;
+                            }
+                        }
+                        
+                        console.log(`📦 Pallet ${pallet.palletId} (basic data): category="${category}", units=${totalUnits}`);
+                        
+                        if (!destinationStats.has(category)) {
+                            destinationStats.set(category, { pallets: 0, units: 0 });
+                        }
+                        
+                        const stats = destinationStats.get(category);
+                        stats.pallets += 1;
+                        stats.units += totalUnits;
+                    }
+                });
+                
+                // Sort destinations by pallets (descending) to show most important first
+                const sortedDestinations = Array.from(destinationStats.entries()).sort((a, b) => b[1].pallets - a[1].pallets);
+                
+                // Add each destination line in format "CATEGORY:pallets/units"
+                sortedDestinations.forEach(([category, stats]) => {
+                    if (description !== '') description += '\n';
+                    description += `${category}:${stats.pallets}/${stats.units}`;
+                });
+                
+                // Add total line only if there are multiple destinations
+                if (sortedDestinations.length > 1) {
+                    const totalUnits = scanResults.totalUnits || 0;
+                    const totalPallets = scanResults.totalPallets || 0;
+                    if (description !== '') description += '\n';
+                    description += `TOTAL:${totalPallets}/${totalUnits}`;
+                }
+                
+                console.log(`📝 Generated description for ${containerId}:`, description);
+                console.log(`📊 Final destination stats:`, Array.from(destinationStats.entries()));
+                return description;
+                
+            } catch (error) {
+                console.error('Error generating description:', error);
+                return 'Error generating description';
+            }
+        },
+        
+        // Add Units and CSV columns to search results table (like original)
+        enhanceSearchResultsTable: function() {
+            // Only enhance tables if we're on the search page
+            if (!this.isOnSearchPage()) {
+                return;
+            }
+            
+            const tables = document.querySelectorAll('table');
+            
+            tables.forEach(table => {
+                if (this.isSearchResultsTable(table) && !table.querySelector('[data-riv-column]')) {
+                    this.addUnitsAndCSVColumns(table);
+                    // Also clean up sortation category cells
+                    this.cleanSortationCategoryCells(table);
+                }
+            });
+        },
+        
+        // Check if we're currently on the search page
+        isOnSearchPage: function() {
+            return window.location.pathname.includes('/search') || 
+                   document.title.toLowerCase().includes('search') ||
+                   document.querySelector('[data-testid="search"]') !== null;
+        },
+        
+        // Check if table is a search results table
+        isSearchResultsTable: function(table) {
+            // Don't enhance tables in modals or overlays
+            const modal = table.closest('[style*="position: fixed"]');
+            const overlay = table.closest('[id*="-app"], [id*="modal"], [id*="overlay"]');
+            if (modal || overlay) {
+                return false;
+            }
+            
+            // Must have the specific search container table class
+            if (!table.classList.contains('searched-container-table')) {
+                return false;
+            }
+            
+            const headers = table.querySelectorAll('th');
+            const headerTexts = Array.from(headers).map(h => h.textContent.trim());
+            
+            // Look for specific search result table headers
+            const hasTrailerInfo = headerTexts.some(text => text.includes('TRAILER Information'));
+            const hasContainerInfo = headerTexts.some(text => text.includes('Container Information'));
+            const hasTrailerID = headerTexts.some(text => text.includes('Trailer ID'));
+            const hasPallet = headerTexts.some(text => text.includes('PALLET'));
+            const hasTote = headerTexts.some(text => text.includes('TOTE'));
+            
+            // Must be a search results table with proper structure
+            return (hasTrailerInfo || hasContainerInfo) && (hasTrailerID || hasPallet || hasTote);
+        },
+        
+        // Add Units and CSV columns to table (exactly like original)
+        addUnitsAndCSVColumns: function(table) {
+            const headerRows = table.querySelectorAll('thead tr');
+            
+            // First, shorten existing column names to save space
+            this.shortenColumnNames(table);
+            
+            // First header row (main title) - update colspan
+            if (headerRows[0]) {
+                const mainHeader = headerRows[0].querySelector('th');
+                if (mainHeader) {
+                    const currentColspan = parseInt(mainHeader.getAttribute('colspan')) || 6;
+                    mainHeader.setAttribute('colspan', currentColspan + 4); // +4 for Units, CSV, CDD, Description
+                }
+            }
+            
+            // Second header row - add Units and CSV headers
+            if (headerRows[1]) {
+                // Add Units column header
+                const totalItemsHeader = document.createElement('th');
+                totalItemsHeader.className = 'css-18tzy6q';
+                totalItemsHeader.scope = 'col';
+                totalItemsHeader.setAttribute('data-riv-column', 'true');
+                totalItemsHeader.innerHTML = '<span>Units</span>';
+                headerRows[1].appendChild(totalItemsHeader);
+                
+                // Add CDD column header
+                const cddHeader = document.createElement('th');
+                cddHeader.className = 'css-18tzy6q';
+                cddHeader.scope = 'col';
+                cddHeader.setAttribute('data-riv-cdd-column', 'true');
+                cddHeader.innerHTML = '<span>CDD</span>';
+                headerRows[1].appendChild(cddHeader);
+                
+                // Add Description column header
+                const descHeader = document.createElement('th');
+                descHeader.className = 'css-18tzy6q';
+                descHeader.scope = 'col';
+                descHeader.setAttribute('data-riv-desc-column', 'true');
+                descHeader.innerHTML = '<span>Description</span>';
+                headerRows[1].appendChild(descHeader);
+                
+                // Add CSV column header
+                const csvHeader = document.createElement('th');
+                csvHeader.className = 'css-18tzy6q';
+                csvHeader.scope = 'col';
+                csvHeader.setAttribute('data-riv-csv-column', 'true');
+                csvHeader.innerHTML = '<span>CSV</span>';
+                headerRows[1].appendChild(csvHeader);
+            }
+            
+            // Add data cells to existing data row
+            const dataRows = table.querySelectorAll('tbody tr');
+            dataRows.forEach((row, index) => {
+                if (!row.querySelector('td[data-riv-cell]')) {
+                    // Add Units cell
+                    const totalItemsCell = document.createElement('td');
+                    totalItemsCell.className = 'css-18tzy6q';
+                    totalItemsCell.setAttribute('data-riv-cell', 'true');
+                    totalItemsCell.innerHTML = `<span id="riv-total-items-${index}">Analyzing...</span>`;
+                    row.appendChild(totalItemsCell);
+                    
+                    // Add CDD cell
+                    const cddCell = document.createElement('td');
+                    cddCell.className = 'css-18tzy6q';
+                    cddCell.setAttribute('data-riv-cdd-cell', 'true');
+                    cddCell.innerHTML = `<span id="riv-cdd-${index}">-</span>`;
+                    row.appendChild(cddCell);
+                    
+                    // Add Description cell
+                    const descCell = document.createElement('td');
+                    descCell.className = 'css-18tzy6q';
+                    descCell.setAttribute('data-riv-desc-cell', 'true');
+                    descCell.innerHTML = `<span id="riv-desc-${index}">-</span>`;
+                    row.appendChild(descCell);
+                    
+                    // Add CSV cell
+                    const csvCell = document.createElement('td');
+                    csvCell.className = 'css-18tzy6q';
+                    csvCell.setAttribute('data-riv-csv-cell', 'true');
+                    csvCell.style.textAlign = 'center';
+                    csvCell.innerHTML = `<button id="riv-export-btn-${index}" style="display:none; background:none; border:none; cursor:pointer; font-size:16px; padding:5px;" title="Download CSV">📊</button>`;
+                    row.appendChild(csvCell);
+                    
+                    // Start analysis for this container
+                    this.analyzeContainerInRow(row, index);
+                }
+            });
+        },
+        
+        // Get container ID from table row
+        getContainerIdFromRow: function(row) {
+            const cells = row.querySelectorAll('td');
+            for (const cell of cells) {
+                const text = cell.textContent.trim();
+                // Look for container ID patterns
+                if (text.match(/^[A-Z0-9-]+$/i) && text.length > 3) {
+                    return text;
+                }
+            }
+            return '';
+        },
+        
+        // Shorten column names to save space
+        shortenColumnNames: function(table) {
+            const columnMappings = {
+                'Sortation Category': 'Category',
+                'Latest Operation Associate': 'Associate',
+                'Trailer ID': 'Trailer'
+            };
+            
+            // Find all header cells and shorten long column names
+            const headerCells = table.querySelectorAll('thead th');
+            headerCells.forEach(cell => {
+                const span = cell.querySelector('span');
+                if (span) {
+                    const originalText = span.textContent.trim();
+                    if (columnMappings[originalText]) {
+                        span.textContent = columnMappings[originalText];
+                        cell.title = originalText; // Keep original text in tooltip
+                        console.log(`📏 Shortened column: "${originalText}" → "${columnMappings[originalText]}"`);
+                    }
+                }
+            });
+        },
+        
+        // Clean and format sortation category cells to save space
+        cleanSortationCategoryCells: function(table) {
+            // Find the sortation category column index
+            const headerRow = table.querySelector('thead tr:last-child');
+            if (!headerRow) return;
+            
+            const headers = headerRow.querySelectorAll('th');
+            let categoryColumnIndex = -1;
+            
+            headers.forEach((header, index) => {
+                const headerText = header.textContent.trim().toLowerCase();
+                if (headerText.includes('sortation') || headerText.includes('category')) {
+                    categoryColumnIndex = index;
+                }
+            });
+            
+            if (categoryColumnIndex === -1) {
+                console.log('📝 Sortation Category column not found');
+                return;
+            }
+            
+            console.log(`📝 Found Sortation Category column at index ${categoryColumnIndex}`);
+            
+            // Process each data row
+            const dataRows = table.querySelectorAll('tbody tr');
+            dataRows.forEach((row, rowIndex) => {
+                const cells = row.querySelectorAll('td');
+                if (cells[categoryColumnIndex]) {
+                    const cell = cells[categoryColumnIndex];
+                    const span = cell.querySelector('span');
+                    if (span) {
+                        const originalText = span.textContent.trim();
+                        
+                        if (originalText && originalText !== '-' && originalText.length > 0) {
+                            const cleanedText = this.formatSortationCategoryText(originalText);
+                            
+                            // Update the cell content
+                            span.innerHTML = cleanedText.replace(/\n/g, '<br>');
+                            cell.style.lineHeight = '1.3'; // Compact line spacing
+                            cell.style.whiteSpace = 'normal'; // Allow line breaks
+                            cell.title = originalText; // Keep original in tooltip
+                            
+                            console.log(`📝 Cleaned category cell ${rowIndex}: "${originalText}" → "${cleanedText.replace(/\n/g, ' | ')}"`);
+                        }
+                    }
+                }
+            });
+        },
+        
+        // Format sortation category text: clean and display on separate lines
+        formatSortationCategoryText: function(originalText) {
+            try {
+                // Split by comma to get individual categories
+                const categories = originalText.split(',').map(cat => cat.trim());
+                
+                // Clean each category by removing number prefix
+                const cleanedCategories = categories.map(category => {
+                    return this.cleanCategoryName(category);
+                }).filter(cat => cat && cat !== 'Unknown'); // Remove empty or Unknown
+                
+                // Join with line breaks for vertical display
+                return cleanedCategories.join('\n');
+                
+            } catch (error) {
+                console.warn('Error formatting sortation category text:', originalText, error);
+                return originalText; // Return original on error
+            }
+        },
+        
+        // Analyze container and update Units count
+        analyzeContainerInRow: async function(row, index) {
+            const containerId = this.getContainerIdFromRow(row);
+            if (!containerId) return;
+            
+            const totalItemsElement = document.getElementById(`riv-total-items-${index}`);
+            const exportButton = document.getElementById(`riv-export-btn-${index}`);
+            
+            if (!totalItemsElement) return;
+            
+            try {
+                // Update progress
+                totalItemsElement.innerHTML = '<span>Scanning...</span>';
+                
+                // Perform deep scan using our advanced function
+                const scanResults = await this.performAdvancedDeepScan(containerId, 
+                    (message, progress) => {
+                        if (totalItemsElement) {
+                            totalItemsElement.innerHTML = `<span>${Math.round(progress)}%</span>`;
+                            totalItemsElement.title = message;
+                        }
+                    }
+                );
+                
+                // Update with final results
+                if (totalItemsElement) {
+                    totalItemsElement.innerHTML = `<strong>${scanResults.totalUnits}</strong>`;
+                    totalItemsElement.title = `Deep scan completed: ${scanResults.totalPallets} pallets, ${scanResults.totalTotes} totes, ${scanResults.totalUnits} units`;
+                    
+                    // Add subtle highlight to the cell
+                    const cell = totalItemsElement.closest('td');
+                    if (cell) {
+                        cell.style.background = 'rgba(40, 167, 69, 0.1)';
+                        cell.style.border = '1px solid rgba(40, 167, 69, 0.3)';
+                    }
+                }
+                
+                // Update CDD field
+                const cddElement = document.getElementById(`riv-cdd-${index}`);
+                console.log(`🔍 Looking for CDD element: riv-cdd-${index}`, cddElement);
+                console.log(`🔍 Scan results CDD:`, scanResults.oldestCDD);
+                
+                if (cddElement) {
+                    if (scanResults.oldestCDD) {
+                        // Format CDD for display in new format
+                        const cddDisplay = this.formatCDDDate(scanResults.oldestCDD);
+                        cddElement.innerHTML = cddDisplay;
+                        
+                        // Enhanced tooltip with detailed info
+                        if (scanResults.oldestCDDDetails) {
+                            const details = scanResults.oldestCDDDetails;
+                            cddElement.title = `Oldest Clean Decant Date: ${details.date}
+                            Tote ID: ${details.toteId}
+                            Pallet ID: ${details.palletId}
+                            Units: ${details.units}
+                            Category: ${details.sortationCategory}
+                            Destination: ${details.destination}
+                            Formatted: ${cddDisplay}`;
+                        } else {
+                            cddElement.title = `Oldest Clean Decant Date: ${scanResults.oldestCDD}
+                            Formatted: ${cddDisplay}`;
+                        }
+                        
+                        cddElement.style.whiteSpace = 'nowrap'; // Prevent wrapping
+                        console.log(`✅ CDD updated to: ${cddDisplay} (original: ${scanResults.oldestCDD})`);
+                    } else {
+                        cddElement.innerHTML = 'No CDD';
+                        console.log(`⚠️ No CDD found for container`);
+                    }
+                } else {
+                    console.error(`❌ CDD element not found: riv-cdd-${index}`);
+                }
+                
+                // Update Description field
+                const descElement = document.getElementById(`riv-desc-${index}`);
+                console.log(`🔍 Looking for Description element: riv-desc-${index}`, descElement);
+                
+                if (descElement) {
+                    const description = this.generateDescription(scanResults, containerId);
+                    // Use white-space: pre-line to preserve line breaks
+                    descElement.innerHTML = description.replace(/\n/g, '<br>');
+                    descElement.style.whiteSpace = 'pre-line';
+                    descElement.style.lineHeight = '1.2';
+                    descElement.title = description; // Full text in tooltip
+                    console.log(`✅ Description updated for container ${containerId}`);
+                } else {
+                    console.error(`❌ Description element not found: riv-desc-${index}`);
+                }
+                
+                // Show export button
+                if (exportButton) {
+                    exportButton.style.display = 'block';
+                    exportButton.onclick = () => this.exportAdvancedScanResults(scanResults);
+                }
+                
+                // Store results for export
+                window[`rivScanResults_${index}`] = scanResults;
+                
+                console.log(`✅ Container ${containerId} analysis complete:`, scanResults);
+                
+            } catch (error) {
+                console.error(`❌ Error analyzing ${containerId}:`, error);
+                
+                if (totalItemsElement) {
+                    totalItemsElement.innerHTML = '<span>Error</span>';
+                    totalItemsElement.title = error.message;
+                    
+                    // Add error styling
+                    const cell = totalItemsElement.closest('td');
+                    if (cell) {
+                        cell.style.background = 'rgba(220, 53, 69, 0.1)';
+                        cell.style.border = '1px solid rgba(220, 53, 69, 0.3)';
+                    }
+                }
+                
+                // Update Description with error
+                const descElement = document.getElementById(`riv-desc-${index}`);
+                if (descElement) {
+                    descElement.innerHTML = 'Analysis failed';
+                    descElement.title = error.message;
+                }
+            }
+        },
+        
+        // Export container data (for CSV button)
+        exportContainerData: function(containerId) {
+            // Find the scan results for this container
+            for (let key in window) {
+                if (key.startsWith('rivScanResults_') && window[key] && window[key].containerId === containerId) {
+                    this.exportAdvancedScanResults(window[key]);
+                    return;
+                }
+            }
+            alert('No scan data found for this container. Please wait for analysis to complete.');
+        },
+        
+        // Start monitoring for search results tables
+        startTableMonitoring: function() {
+            // Check for tables immediately
+            this.enhanceSearchResultsTable();
+            
+            // Set up mutation observer to watch for new tables
+            const observer = new MutationObserver((mutations) => {
+                let shouldCheck = false;
+                
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                if (node.tagName === 'TABLE' || node.querySelector('table')) {
+                                    shouldCheck = true;
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                if (shouldCheck) {
+                    setTimeout(() => this.enhanceSearchResultsTable(), 500);
+                }
+            });
+            
+            // Start observing
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // Also check periodically for tables that might be dynamically created
+            setInterval(() => {
+                this.enhanceSearchResultsTable();
+            }, 2000);
+            
+            console.log('🔍 Search table monitoring started');
+        }
+    };
+    
+    // ========================================================================
     // ========================================================================
     
     // ========================================================================
@@ -3071,6 +4389,9 @@
     
     // Initialize UI enhancements (menu, interface modifications)
     UIEnhancements.init();
+    
+    // Start monitoring search results tables
+    SearchModule.startTableMonitoring();
     
     // Auto-load session data in background
     setTimeout(async () => {
