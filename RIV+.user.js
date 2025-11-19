@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.9.2
+// @version      3.9.3
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -11,8 +11,8 @@
 // @run-at       document-start
 // @homepageURL  https://github.com/dariuszkubica/RIV-ReloUp
 // @supportURL   https://github.com/dariuszkubica/RIV-ReloUp/issues
-// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.user.js
-// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV%20-%20ReloUp.user.js
+// @downloadURL  https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV+.user.js
+// @updateURL    https://raw.githubusercontent.com/dariuszkubica/RIV-ReloUp/main/RIV+.user.js
 // ==/UserScript==
 
 (function() {
@@ -455,21 +455,28 @@
         '9 - SPECIALITY URGENT': 'BTS2',
         '9 - SPECIALTY URGENT': 'BTS2',  // Alternative spelling
         '7 - HRV URGENT': 'BTS2',
+        '4 - FAST PROCESSING TTA': 'BTS2',
         '5 - FAST PROCESSING TTA': 'BTS2',
         '1 - TECH TTA': 'BTS2',
+        '1 - TECH TTA SIDELINE': 'BTS2',
+        '6 - NON TECH TTA': 'BTS2',
         'PROBLEM SOLVE': 'KTW1',
         '3 - APPAREL TTA': 'KTW1',
         'APPAREL URGENT': 'KTW1',
+        '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
         'S&A FAST PROCESSING TTA': 'KTW1',
         'SHOES URGENT': 'KTW1',
         'BROKEN AND LEAKING': 'KTW1',
         'SHARP': 'KTW1',
         'BWS': 'KTW1',
+        'APPAREL SIDELINE': 'KTW1',
         '8 - BMVD URGENT': 'LCJ4',
         'URGENT LCJ4': 'LCJ4',
         'NON TECH TTA LCJ4': 'LCJ4',
         '4 - LOW VALUE TTA': 'LCJ4',
         'Tech TTA LCJ4': 'LCJ4',
+        'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
+        'TECH TTA LCJ4 SIDELINE': 'LCJ4',
         '0 - NON-SORT': 'WRO1'
     };
     
