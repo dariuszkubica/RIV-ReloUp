@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RIV+
 // @namespace    KTW1
-// @version      3.9.3
+// @version      4.0
 // @author       Dariusz Kubica (kubicdar)
 // @copyright    2025+, Dariusz Kubica (https://github.com/dariuszkubica)
 // @license      Licensed with the consent of the author
@@ -888,26 +888,32 @@
      */
     const CategoryMapper = {
         
-        // Category to Main Destination mapping
-        destinationMap: {
-        '6 - NON TECH TTA' : 'BTS2',
-        '4 - FAST PROCESSING TTA': 'BTS2',
-        'S&A FAST PROCESSING TTA': 'KTW1',
-        'NON TECH TTA LCJ4' : 'LCJ4',
-        'APPAREL SIDELINE': 'KTW1',
-        '1 - TECH TTA SIDELINE': 'BTS2',
-        '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
-        'TECH TTA LCJ4 SIDELINE': 'LCJ4',
-        'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
-        '7 - HRV URGENT': 'BTS2',
-        'SHOES URGENT': 'KTW1',
-        'APPAREL URGENT': 'KTW1',
-        '8 - BMVD URGENT': 'LCJ4',
-        'URGENT LCJ4': 'LCJ4',
-
-        //OLD
-        '1 - TECH TTA' : 'BTS2',
-        'Tech TTA LCJ4' : 'LCJ4'
+        // Get destination map from settings (dynamic)
+        getDestinationMap: function() {
+            const settings = SettingsManager.get();
+            return settings.categoryMappings || this.getDefaultDestinationMap();
+        },
+        
+        // Default destination mappings (fallback)
+        getDefaultDestinationMap: function() {
+            return {
+                '6 - NON TECH TTA' : 'BTS2',
+                '4 - FAST PROCESSING TTA': 'BTS2',
+                'S&A FAST PROCESSING TTA': 'KTW1',
+                'NON TECH TTA LCJ4' : 'LCJ4',
+                'APPAREL SIDELINE': 'KTW1',
+                '1 - TECH TTA SIDELINE': 'BTS2',
+                '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
+                'TECH TTA LCJ4 SIDELINE': 'LCJ4',
+                'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
+                '7 - HRV URGENT': 'BTS2',
+                'SHOES URGENT': 'KTW1',
+                'APPAREL URGENT': 'KTW1',
+                '8 - BMVD URGENT': 'LCJ4',
+                'URGENT LCJ4': 'LCJ4',
+                '1 - TECH TTA' : 'BTS2',
+                'Tech TTA LCJ4' : 'LCJ4'
+            };
         },
         
         // Get main destination for category
@@ -916,17 +922,33 @@
                 return 'Unknown';
             }
             
+            const destinationMap = this.getDestinationMap();
+            
             // Handle multiple categories separated by commas
             const categories = sortationCategory.split(',').map(cat => cat.trim());
             const destinations = new Set();
             
             categories.forEach(category => {
-                const destination = this.destinationMap[category] || 'Unknown';
+                const destination = destinationMap[category] || 'Unknown';
                 destinations.add(destination);
             });
             
             // If multiple destinations, join them
             return Array.from(destinations).sort().join(', ');
+        },
+        
+        // Test category mapping functionality (for debugging)
+        testCategoryMapping: function() {
+            console.log('🧪 Testing Category Mapping functionality...');
+            
+            const testCategories = ['6 - NON TECH TTA', 'S&A FAST PROCESSING TTA', 'UNKNOWN CATEGORY'];
+            
+            testCategories.forEach(category => {
+                const destination = this.getMainDestination(category);
+                console.log(`   ${category} -> ${destination}`);
+            });
+            
+            console.log('✅ Category mapping test complete');
         }
     };
     
@@ -1360,9 +1382,9 @@
                             border: 2px solid #ffc107;
                         ">
                             <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-                            <h3 style="color: #856404; margin-bottom: 15px; font-weight: 600;">Brak danych sesji</h3>
+                            <h3 style="color: #856404; margin-bottom: 15px; font-weight: 600;">No Session Data</h3>
                             <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
-                                Aby Dashboard mógł działać poprawnie, należy najpierw:
+                                For Dashboard to work properly, you need to first:
                             </p>
                             <div style="
                                 background: #fff3cd;
@@ -1372,16 +1394,15 @@
                                 margin: 20px 0;
                                 text-align: left;
                             ">
-                                <h4 style="color: #856404; margin: 0 0 10px 0;">🔍 Instrukcja:</h4>
+                                <h4 style="color: #856404; margin: 0 0 10px 0;">🔍 Instructions:</h4>
                                 <ol style="color: #856404; margin: 0; padding-left: 20px;">
-                                    <li>Wróć do głównej strony RIV</li>
-                                    <li>Wyszukaj dowolną Drop Zone z towarem</li>
-                                    <li>Poczekaj na załadowanie wyników</li>
-                                    <li>Wróć do Dashboard i spróbuj ponownie</li>
+                                    <li>Go to the Identification page</li>
+                                    <li>Search for any empty entry</li>
+                                    <li>Return to Dashboard</li>
                                 </ol>
                             </div>
                             <p style="color: #6c757d; font-size: 13px; margin-top: 15px;">
-                                Dashboard potrzebuje aktywnych danych sesji aby wykonywać zapytania do systemu.
+                                Dashboard needs active session data to perform system queries.
                             </p>
                         </div>
                     `;
@@ -2113,9 +2134,9 @@
                             border: 2px solid #6f42c1;
                         ">
                             <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-                            <h3 style="color: #5a31a1; margin-bottom: 15px; font-weight: 600;">Brak danych sesji</h3>
+                            <h3 style="color: #5a31a1; margin-bottom: 15px; font-weight: 600;">No Session Data</h3>
                             <p style="color: #666; margin-bottom: 20px; line-height: 1.5;">
-                                Aby PalletLand mógł działać poprawnie, należy najpierw:
+                                For PalletLand to work properly, you need to first:
                             </p>
                             <div style="
                                 background: #f8f4ff;
@@ -2125,16 +2146,15 @@
                                 margin: 20px 0;
                                 text-align: left;
                             ">
-                                <h4 style="color: #5a31a1; margin: 0 0 10px 0;">🔍 Instrukcja:</h4>
+                                <h4 style="color: #5a31a1; margin: 0 0 10px 0;">🔍 Instructions:</h4>
                                 <ol style="color: #5a31a1; margin: 0; padding-left: 20px;">
-                                    <li>Wróć do głównej strony RIV</li>
-                                    <li>Wyszukaj dowolną Drop Zone z towarem</li>
-                                    <li>Poczekaj na załadowanie wyników</li>
-                                    <li>Wróć do PalletLand i spróbuj ponownie</li>
+                                    <li>Go to the Identification page</li>
+                                    <li>Search for any empty entry</li>
+                                    <li>Return to PalletLand</li>
                                 </ol>
                             </div>
                             <p style="color: #6c757d; font-size: 13px; margin-top: 15px;">
-                                PalletLand potrzebuje aktywnych danych sesji aby wykonywać zapytania do systemu.
+                                PalletLand needs active session data to perform system queries.
                             </p>
                         </div>
                     `;
@@ -3926,7 +3946,26 @@
             dashboardSegments: [
                 { prefix: 'DZ-CD', from: 1, to: 26, enabled: true }
             ],
-            dashboardCustomDestinations: 'DZ-CD-ALL'
+            dashboardCustomDestinations: 'DZ-CD-ALL',
+            // Category to destination mappings
+            categoryMappings: {
+                '6 - NON TECH TTA': 'BTS2',
+                '4 - FAST PROCESSING TTA': 'BTS2',
+                'S&A FAST PROCESSING TTA': 'KTW1',
+                'NON TECH TTA LCJ4': 'LCJ4',
+                'APPAREL SIDELINE': 'KTW1',
+                '1 - TECH TTA SIDELINE': 'BTS2',
+                '3 - S&A FAST PROCESSING SIDELINE': 'KTW1',
+                'TECH TTA LCJ4 SIDELINE': 'LCJ4',
+                'NON TECH TTA LCJ4 SIDELINE': 'LCJ4',
+                '7 - HRV URGENT': 'BTS2',
+                'SHOES URGENT': 'KTW1',
+                'APPAREL URGENT': 'KTW1',
+                '8 - BMVD URGENT': 'LCJ4',
+                'URGENT LCJ4': 'LCJ4',
+                '1 - TECH TTA': 'BTS2',
+                'Tech TTA LCJ4': 'LCJ4'
+            }
         },
         
         // Current settings (loaded from localStorage or defaults)
@@ -3988,6 +4027,9 @@
             
             // Dashboard settings
             const dashboardCustomDestInput = document.getElementById('dashboard-custom-destinations');
+            
+            // Category mappings
+            const categoryMappingsInput = document.getElementById('category-mappings');
 
             this.settings.filenamePrefix = filenamePrefixInput?.value || 'RIV';
             this.settings.includeTimestamp = includeTimestampInput?.checked || false;
@@ -3998,6 +4040,19 @@
             
             // Dashboard settings
             this.settings.dashboardCustomDestinations = dashboardCustomDestInput?.value || '';
+            
+            // Category mappings
+            if (categoryMappingsInput) {
+                try {
+                    const mappings = JSON.parse(categoryMappingsInput.value);
+                    if (typeof mappings === 'object' && mappings !== null) {
+                        this.settings.categoryMappings = mappings;
+                        console.log('✅ Category mappings updated successfully');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Invalid category mappings JSON, keeping previous settings:', e.message);
+                }
+            }
             
             // Segments are already updated in real-time via the global update functions
             this.save();
@@ -4014,6 +4069,9 @@
             
             // Dashboard settings
             const dashboardCustomDestInput = document.getElementById('dashboard-custom-destinations');
+            
+            // Category mappings
+            const categoryMappingsInput = document.getElementById('category-mappings');
 
             if (filenamePrefixInput) filenamePrefixInput.value = this.settings.filenamePrefix;
             if (includeTimestampInput) includeTimestampInput.checked = this.settings.includeTimestamp;
@@ -4024,6 +4082,12 @@
             
             // Dashboard settings
             if (dashboardCustomDestInput) dashboardCustomDestInput.value = this.settings.dashboardCustomDestinations || '';
+            
+            // Category mappings
+            if (categoryMappingsInput) {
+                const mappings = this.settings.categoryMappings || this.defaultSettings.categoryMappings;
+                categoryMappingsInput.value = JSON.stringify(mappings, null, 2);
+            }
             
             // Load segments configuration
             this.loadSegments();
@@ -4203,146 +4267,337 @@
                 justify-content: center;
             `;
 
-            // Create modal content
+            // Create modal content - much larger size
             const modal = document.createElement('div');
             modal.style.cssText = `
                 background: white;
-                border-radius: 8px;
-                padding: 20px;
-                max-width: 500px;
-                width: 90%;
-                max-height: 80vh;
-                overflow-y: auto;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                border-radius: 12px;
+                padding: 0;
+                width: 95%;
+                max-width: 1200px;
+                height: 90vh;
+                max-height: 800px;
+                overflow: hidden;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                display: flex;
+                flex-direction: column;
             `;
 
             modal.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-                    <h2 style="margin: 0; color: #333;">RIV - ReloUp Settings</h2>
-                    <button id="close-settings" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 2px solid #e0e0e0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h2 style="margin: 0; font-size: 24px; font-weight: 600;">⚙️ RIV - ReloUp Settings</h2>
+                    <button id="close-settings" style="background: rgba(255,255,255,0.2); border: none; font-size: 28px; cursor: pointer; color: white; padding: 5px 10px; border-radius: 6px; transition: all 0.3s ease;">&times;</button>
                 </div>
                 
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">🎨 Interface Settings</h3>
-                    
-                    <label style="display: block; margin-bottom: 10px;">
-                        <input type="checkbox" id="show-palletland" style="margin-right: 10px;">
-                        Show Palletland option in footer menu
-                    </label>
-                    
-                    <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460; margin-bottom: 15px;">
-                        <strong>Note:</strong> Uncheck to hide Palletland from the footer menu if you only need Dashboard functionality.
-                    </div>
+                <!-- Tab Navigation -->
+                <div style="display: flex; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                    <button class="settings-tab" data-tab="interface" style="flex: 1; padding: 15px 20px; background: white; border: none; border-bottom: 3px solid #007bff; cursor: pointer; font-weight: 600; color: #007bff; transition: all 0.3s ease;">
+                        🎨 Interface
+                    </button>
+                    <button class="settings-tab" data-tab="palletland" style="flex: 1; padding: 15px 20px; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 500; color: #6c757d; transition: all 0.3s ease;">
+                        📦 Palletland
+                    </button>
+                    <button class="settings-tab" data-tab="dashboard" style="flex: 1; padding: 15px 20px; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 500; color: #6c757d; transition: all 0.3s ease;">
+                        📊 Dashboard
+                    </button>
+                    <button class="settings-tab" data-tab="advanced" style="flex: 1; padding: 15px 20px; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 500; color: #6c757d; transition: all 0.3s ease;">
+                        🔧 Advanced
+                    </button>
                 </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">📦 Palletland Configuration</h3>
+                
+                <!-- Tab Content Container -->
+                <div style="flex: 1; overflow-y: auto; padding: 30px;">
                     
-                    <div style="margin-bottom: 15px;">
-                        <div style="margin-bottom: 15px;">
-                            <h4 style="color: #666; margin-bottom: 10px;">Destination Segments:</h4>
-                            <div id="segments-container" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
-                                <!-- Segments will be dynamically generated here -->
+                    <!-- Interface Tab -->
+                    <div id="tab-interface" class="tab-content" style="display: block;">
+                        <div style="max-width: 800px; margin: 0 auto;">
+                            <h3 style="color: #495057; margin-bottom: 20px; font-size: 20px; display: flex; align-items: center;">
+                                🎨 <span style="margin-left: 10px;">Interface Settings</span>
+                            </h3>
+                            
+                            <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px;">
+                                <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">Menu Options</h4>
+                                
+                                <label style="display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; padding: 10px; border-radius: 8px; transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <input type="checkbox" id="show-palletland" style="margin-right: 15px; transform: scale(1.2);">
+                                    <div>
+                                        <div style="font-weight: 500; color: #495057;">Show Palletland option in footer menu</div>
+                                        <div style="font-size: 12px; color: #6c757d; margin-top: 2px;">Enable/disable the Palletland feature in the footer navigation</div>
+                                    </div>
+                                </label>
                             </div>
-                            <button type="button" id="add-segment" style="margin-top: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">+ Add Segment</button>
+                            
+                            <div style="background: #e3f2fd; padding: 20px; border-radius: 12px; border-left: 4px solid #2196f3;">
+                                <h5 style="margin: 0 0 8px 0; color: #1976d2; font-size: 14px;">💡 Tip</h5>
+                                <p style="margin: 0; font-size: 13px; color: #1565c0; line-height: 1.5;">
+                                    Uncheck the Palletland option if you only need Dashboard functionality. This will clean up the footer menu and focus on core features.
+                                </p>
+                            </div>
                         </div>
-                        
-                        <label style="display: block; margin-bottom: 10px;">
-                            Custom destinations (one per line):
-                            <textarea id="custom-destinations" placeholder="DZ-SPECIAL-01&#10;DZ-TEST-A05&#10;DZ-CUSTOM-B12" 
-                                      style="width: 100%; height: 60px; margin-top: 5px; padding: 5px; font-family: monospace; font-size: 12px;"></textarea>
-                        </label>
                     </div>
                     
-                    <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; color: #0c5460;">
-                        <strong>Example:</strong> Prefix "DZ-CDPL-A" (1-25) + Prefix "DZ-SPEC-TEST" (10-15) = DZ-CDPL-A01...A25, DZ-SPEC-TEST10...TEST15
+                    <!-- Palletland Tab -->
+                    <div id="tab-palletland" class="tab-content" style="display: none;">
+                        <div style="max-width: 1000px; margin: 0 auto;">
+                            <h3 style="color: #495057; margin-bottom: 20px; font-size: 20px; display: flex; align-items: center;">
+                                📦 <span style="margin-left: 10px;">Palletland Configuration</span>
+                            </h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                                <!-- Destination Segments -->
+                                <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">🎯 Destination Segments</h4>
+                                    <div id="segments-container" style="border: 1px solid #dee2e6; padding: 15px; border-radius: 8px; background: #f8f9fa; margin-bottom: 15px; min-height: 200px;">
+                                        <!-- Segments will be dynamically generated here -->
+                                    </div>
+                                    <button type="button" id="add-segment" style="width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: background-color 0.3s ease;">
+                                        + Add New Segment
+                                    </button>
+                                </div>
+                                
+                                <!-- Custom Destinations -->
+                                <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">📝 Custom Destinations</h4>
+                                    <label style="display: block; margin-bottom: 10px; font-size: 14px; color: #6c757d;">
+                                        Additional destinations (one per line):
+                                    </label>
+                                    <textarea id="custom-destinations"
+                                              style="width: 100%; height: 200px; padding: 12px; font-family: 'Courier New', monospace; font-size: 13px; border: 1px solid #dee2e6; border-radius: 8px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #e8f5e8; padding: 20px; border-radius: 12px; border-left: 4px solid #28a745; margin-top: 25px;">
+                                <h5 style="margin: 0 0 8px 0; color: #155724; font-size: 14px;">💡 How it works</h5>
+                                <p style="margin: 0; font-size: 13px; color: #155724; line-height: 1.5;">
+                                    <strong>Segments:</strong> Prefix "DZ-CDPL-A" from 1 to 25 generates: DZ-CDPL-A01, DZ-CDPL-A02, ..., DZ-CDPL-A25<br>
+                                    <strong>Custom:</strong> Use for special zones that don't follow the standard naming pattern
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dashboard Tab -->
+                    <div id="tab-dashboard" class="tab-content" style="display: none;">
+                        <div style="max-width: 1000px; margin: 0 auto;">
+                            <h3 style="color: #495057; margin-bottom: 20px; font-size: 20px; display: flex; align-items: center;">
+                                📊 <span style="margin-left: 10px;">Dashboard Configuration</span>
+                            </h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                                <!-- Dashboard Segments -->
+                                <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">🎯 Dashboard Segments</h4>
+                                    <div id="dashboard-segments-container" style="border: 1px solid #dee2e6; padding: 15px; border-radius: 8px; background: #f8f9fa; margin-bottom: 15px; min-height: 200px;">
+                                        <!-- Dashboard segments will be dynamically generated here -->
+                                    </div>
+                                    <button type="button" id="add-dashboard-segment" style="width: 100%; padding: 10px; background: #17a2b8; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: background-color 0.3s ease;">
+                                        + Add Dashboard Segment
+                                    </button>
+                                </div>
+                                
+                                <!-- Custom Dashboard Destinations -->
+                                <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">📝 Custom Dashboard Destinations</h4>
+                                    <label style="display: block; margin-bottom: 10px; font-size: 14px; color: #6c757d;">
+                                        Additional destinations (one per line):
+                                    </label>
+                                    <textarea id="dashboard-custom-destinations" placeholder="DZ-CDALL&#10;DZ-SPECIAL&#10;DZ-OVERFLOW" 
+                                              style="width: 100%; height: 200px; padding: 12px; font-family: 'Courier New', monospace; font-size: 13px; border: 1px solid #dee2e6; border-radius: 8px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #e3f2fd; padding: 20px; border-radius: 12px; border-left: 4px solid #2196f3; margin-top: 25px;">
+                                <h5 style="margin: 0 0 8px 0; color: #1976d2; font-size: 14px;">📈 Dashboard vs Palletland</h5>
+                                <p style="margin: 0; font-size: 13px; color: #1565c0; line-height: 1.5;">
+                                    <strong>Dashboard:</strong> Quick overview with fewer zones for daily monitoring<br>
+                                    <strong>Palletland:</strong> Comprehensive analysis with many zones for detailed reporting
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Tab -->
+                    <div id="tab-advanced" class="tab-content" style="display: none;">
+                        <div style="max-width: 800px; margin: 0 auto;">
+                            <h3 style="color: #495057; margin-bottom: 20px; font-size: 20px; display: flex; align-items: center;">
+                                🔧 <span style="margin-left: 10px;">Advanced Settings</span>
+                            </h3>
+                            
+                            <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px;">
+                                <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">📁 Export Settings</h4>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                    <label style="display: block;">
+                                        <span style="display: block; margin-bottom: 5px; font-weight: 500; color: #495057;">Filename Prefix:</span>
+                                        <input type="text" id="filename-prefix" style="width: 100%; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px;" placeholder="RIV" value="RIV">
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; margin-top: 25px;">
+                                        <input type="checkbox" id="include-timestamp" style="margin-right: 10px; transform: scale(1.2);" checked>
+                                        <span style="font-weight: 500; color: #495057;">Include timestamp in filename</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Category Mappings Section -->
+                            <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px;">
+                                <h4 style="color: #6c757d; margin-bottom: 15px; font-size: 16px;">🗂️ Category to Destination Mapping</h4>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 10px; font-size: 14px; color: #6c757d;">
+                                        Category mappings (JSON format):
+                                    </label>
+                                    <textarea id="category-mappings" placeholder='{\n  "6 - NON TECH TTA": "BTS2",\n  "S&A FAST PROCESSING TTA": "KTW1",\n  "NON TECH TTA LCJ4": "LCJ4"\n}'
+                                              style="width: 100%; height: 250px; padding: 12px; font-family: 'Courier New', monospace; font-size: 12px; border: 1px solid #dee2e6; border-radius: 8px; resize: vertical;"></textarea>
+                                    
+                                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                        <button type="button" id="validate-mappings" style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">✓ Validate JSON</button>
+                                        <button type="button" id="reset-mappings" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">↺ Reset to Defaults</button>
+                                    </div>
+                                    
+                                    <div id="mappings-status" style="margin-top: 10px; padding: 8px; border-radius: 4px; font-size: 12px; display: none;"></div>
+                                </div>
+                                
+                                <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
+                                    <h5 style="margin: 0 0 8px 0; color: #1976d2; font-size: 13px;">💡 How Category Mapping Works</h5>
+                                    <p style="margin: 0; font-size: 12px; color: #1565c0; line-height: 1.5;">
+                                        This maps sortation categories found in containers to main destination codes (BTS2, KTW1, LCJ4). When the script analyzes containers, it will use these mappings to determine the main destination for each category found.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-top: 20px;">
+                                <h5 style="margin: 0 0 8px 0; color: #495057; font-size: 14px;">ℹ️ Script Info</h5>
+                                <p style="margin: 0; font-size: 13px; color: #6c757d; line-height: 1.5; font-family: 'Courier New', monospace;">
+                                    <strong>Version:</strong> ${Core.version || '3.9.3'}<br>
+                                    <strong>Author:</strong> ${Core.metadata?.authorFull || 'Dariusz Kubica (kubicdar)'}<br>
+                                    <strong>GitHub:</strong> <a href="${Core.metadata?.homepageURL || 'https://github.com/dariuszkubica/RIV-ReloUp'}" target="_blank" style="color: #007bff;">Repository</a>
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">📊 Dashboard Configuration</h3>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <div style="margin-bottom: 15px;">
-                            <h4 style="color: #666; margin-bottom: 10px;">Dashboard Segments:</h4>
-                            <div id="dashboard-segments-container" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">
-                                <!-- Dashboard segments will be dynamically generated here -->
-                            </div>
-                            <button type="button" id="add-dashboard-segment" style="margin-top: 10px; padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">+ Add Dashboard Segment</button>
-                        </div>
-                        
-                        <label style="display: block; margin-bottom: 10px;">
-                            Custom Dashboard destinations (one per line):
-                            <textarea id="dashboard-custom-destinations" placeholder="DZ-CDALL&#10;DZ-SPECIAL&#10;DZ-OVERFLOW" 
-                                      style="width: 100%; height: 60px; margin-top: 5px; padding: 5px; font-family: monospace; font-size: 12px;"></textarea>
-                        </label>
+                <!-- Footer -->
+                <div style="padding: 20px; border-top: 1px solid #dee2e6; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 12px; color: #6c757d;">
+                        RIV+ | Settings are saved automatically
                     </div>
-                    
-                    <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
-                        <strong>Dashboard vs Palletland:</strong> Dashboard is for quick overview (fewer zones), Palletland for comprehensive analysis (many zones)
+                    <div>
+                        <button id="reset-settings" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px; font-size: 14px;">
+                            Reset to Defaults
+                        </button>
+                        <button id="save-settings" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                            Save & Close
+                        </button>
                     </div>
-                </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">🎯 Category to Destination Mapping</h3>
-                    
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                        <h4 style="color: #666; margin: 0 0 10px 0;">Current Mapping:</h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto;">
-                            <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #007bff;">
-                                <div style="font-weight: bold; font-size: 12px; color: #007bff; margin-bottom: 5px;">BTS2</div>
-                                <div style="font-size: 10px; color: #666; line-height: 1.3;">6 - NON TECH TTA<br>4 - FAST PROCESSING TTA<br>7 - HRV URGENT<br>+2 more...</div>
-                            </div>
-                            <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #28a745;">
-                                <div style="font-weight: bold; font-size: 12px; color: #28a745; margin-bottom: 5px;">KTW1</div>
-                                <div style="font-size: 10px; color: #666; line-height: 1.3;">S&A FAST PROCESSING TTA<br>APPAREL SIDELINE<br>SHOES URGENT<br>+3 more...</div>
-                            </div>
-                            <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #ffc107;">
-                                <div style="font-weight: bold; font-size: 12px; color: #ffc107; margin-bottom: 5px;">LCJ4</div>
-                                <div style="font-size: 10px; color: #666; line-height: 1.3;">NON TECH TTA LCJ4<br>8 - BMVD URGENT<br>URGENT LCJ4<br>+3 more...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: #e1f5fe; padding: 10px; border-radius: 4px; font-size: 12px; color: #0277bd;">
-                        <strong>How it works:</strong> Categories from your Drop Zone analysis are automatically grouped into main destinations (BTS2, KTW1, LCJ4) for better logistics overview.
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">📁 Export Settings</h3>
-                    <label style="display: block; margin-bottom: 10px;">
-                        Filename prefix: 
-                        <input type="text" id="filename-prefix" value="RIV" style="margin-left: 10px; padding: 5px;">
-                    </label>
-                    <label style="display: block; margin-bottom: 10px;">
-                        <input type="checkbox" id="include-timestamp" checked style="margin-right: 10px;">
-                        Include timestamp in filename
-                    </label>
-                </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #555; margin-bottom: 10px;">ℹ️ Script Info</h3>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                        <p style="margin: 0 0 10px 0; font-family: monospace; font-size: 12px;">
-                            <strong>Version:</strong> ${Core.version || '3.9.3'}<br>
-                            <strong>Author:</strong> ${Core.metadata?.authorFull || 'Dariusz Kubica (kubicdar)'}<br>
-                            <strong>GitHub:</strong> <a href="${Core.metadata?.homepageURL || 'https://github.com/dariuszkubica/RIV-ReloUp'}" target="_blank" style="color: #007bff;">Repository</a>
-                        </p>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-                    <button id="save-settings" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Save Settings</button>
-                    <button id="reset-settings" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Reset to Defaults</button>
                 </div>
             `;
 
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
+            // Setup tab switching functionality
+            const tabs = modal.querySelectorAll('.settings-tab');
+            const tabContents = modal.querySelectorAll('.tab-content');
+            
+            // Function to update tab visibility based on settings
+            const updateTabVisibility = () => {
+                const showPalletlandCheckbox = modal.querySelector('#show-palletland');
+                const palletlandTab = modal.querySelector('[data-tab="palletland"]');
+                const palletlandContent = modal.querySelector('#tab-palletland');
+                
+                if (showPalletlandCheckbox && palletlandTab && palletlandContent) {
+                    const isEnabled = showPalletlandCheckbox.checked;
+                    
+                    if (isEnabled) {
+                        palletlandTab.style.display = 'block';
+                        palletlandTab.style.flex = '1';
+                    } else {
+                        palletlandTab.style.display = 'none';
+                        palletlandTab.style.flex = '0';
+                        
+                        // If Palletland tab is currently active, switch to Interface tab
+                        if (palletlandContent.style.display === 'block') {
+                            // Hide Palletland content
+                            palletlandContent.style.display = 'none';
+                            
+                            // Show Interface tab and content
+                            const interfaceTab = modal.querySelector('[data-tab="interface"]');
+                            const interfaceContent = modal.querySelector('#tab-interface');
+                            
+                            if (interfaceTab && interfaceContent) {
+                                // Reset all tabs
+                                tabs.forEach(t => {
+                                    t.style.background = 'transparent';
+                                    t.style.borderBottomColor = 'transparent';
+                                    t.style.color = '#6c757d';
+                                    t.style.fontWeight = '500';
+                                });
+                                
+                                // Activate Interface tab
+                                interfaceTab.style.background = 'white';
+                                interfaceTab.style.borderBottomColor = '#007bff';
+                                interfaceTab.style.color = '#007bff';
+                                interfaceTab.style.fontWeight = '600';
+                                
+                                // Hide all content, show Interface
+                                tabContents.forEach(content => {
+                                    content.style.display = 'none';
+                                });
+                                interfaceContent.style.display = 'block';
+                            }
+                        }
+                    }
+                }
+            };
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Skip if tab is hidden (Palletland when disabled)
+                    if (tab.style.display === 'none') {
+                        return;
+                    }
+                    
+                    // Remove active state from all tabs
+                    tabs.forEach(t => {
+                        t.style.background = 'transparent';
+                        t.style.borderBottomColor = 'transparent';
+                        t.style.color = '#6c757d';
+                        t.style.fontWeight = '500';
+                    });
+                    
+                    // Add active state to clicked tab
+                    tab.style.background = 'white';
+                    tab.style.borderBottomColor = '#007bff';
+                    tab.style.color = '#007bff';
+                    tab.style.fontWeight = '600';
+                    
+                    // Hide all tab content
+                    tabContents.forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    
+                    // Show clicked tab content
+                    const targetTab = modal.querySelector(`#tab-${tab.dataset.tab}`);
+                    if (targetTab) {
+                        targetTab.style.display = 'block';
+                    }
+                });
+            });
+
             // Apply current settings to modal
             this.applyToModal();
+            
+            // Set up Palletland dependency - update tab visibility when checkbox changes
+            const showPalletlandCheckbox = modal.querySelector('#show-palletland');
+            if (showPalletlandCheckbox) {
+                showPalletlandCheckbox.addEventListener('change', updateTabVisibility);
+            }
+            
+            // Initial tab visibility update
+            updateTabVisibility();
 
             // Event listeners
             document.getElementById('close-settings').onclick = () => overlay.remove();
@@ -4357,6 +4612,45 @@
                     this.applyToModal();
                 }
             };
+
+            // Category mappings event listeners
+            const validateMappingsBtn = modal.querySelector('#validate-mappings');
+            const resetMappingsBtn = modal.querySelector('#reset-mappings');
+            const mappingsTextarea = modal.querySelector('#category-mappings');
+            const mappingsStatus = modal.querySelector('#mappings-status');
+            
+            if (validateMappingsBtn && mappingsTextarea && mappingsStatus) {
+                validateMappingsBtn.onclick = () => {
+                    try {
+                        const mappings = JSON.parse(mappingsTextarea.value);
+                        if (typeof mappings === 'object' && mappings !== null) {
+                            mappingsStatus.style.display = 'block';
+                            mappingsStatus.style.background = '#d4edda';
+                            mappingsStatus.style.color = '#155724';
+                            mappingsStatus.textContent = `✓ Valid JSON! Found ${Object.keys(mappings).length} category mappings.`;
+                        } else {
+                            throw new Error('Must be an object');
+                        }
+                    } catch (e) {
+                        mappingsStatus.style.display = 'block';
+                        mappingsStatus.style.background = '#f8d7da';
+                        mappingsStatus.style.color = '#721c24';
+                        mappingsStatus.textContent = `✗ Invalid JSON: ${e.message}`;
+                    }
+                };
+            }
+            
+            if (resetMappingsBtn && mappingsTextarea) {
+                resetMappingsBtn.onclick = () => {
+                    mappingsTextarea.value = JSON.stringify(this.defaultSettings.categoryMappings, null, 2);
+                    if (mappingsStatus) {
+                        mappingsStatus.style.display = 'block';
+                        mappingsStatus.style.background = '#d1ecf1';
+                        mappingsStatus.style.color = '#0c5460';
+                        mappingsStatus.textContent = '↺ Reset to default mappings';
+                    }
+                };
+            }
 
             // Close on overlay click
             overlay.onclick = (e) => {
@@ -4408,9 +4702,10 @@
     }, 3000); // 3 second delay to allow page to load
     
     console.log('✅ Core initialization completed');
-    console.log(`📊 CategoryMapper loaded with ${Object.keys(CategoryMapper.destinationMap).length} category mappings`);
+    console.log(`📊 CategoryMapper loaded with dynamic configuration from settings`);
     console.log('⚙️ Settings Manager initialized');
     console.log('🎨 UI Enhancements initialized');
+    console.log('🗂️ Category mappings are now user-configurable in Settings -> Advanced tab');
     
     // Expose core modules for debugging (optional)
     if (typeof window !== 'undefined') {
