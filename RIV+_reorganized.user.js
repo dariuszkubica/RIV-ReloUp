@@ -286,6 +286,118 @@
             };
         },
         
+        // Copy to clipboard functionality with Ctrl + LMB
+        initializeCopyToClipboard: function() {
+            // Add click event listener to document for table elements using capture phase
+            document.addEventListener('click', function(event) {
+                // Check if Ctrl key is pressed
+                if (!event.ctrlKey) return;
+                
+                // Check if clicked element is within a table cell or is the button itself
+                let cell = event.target.closest('td, th');
+                if (!cell) return;
+                
+                // Check if it's within our target tables
+                const table = cell.closest('table.searched-container-table');
+                if (!table) return;
+                
+                // Prevent default action and event bubbling immediately
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                
+                // Get text content to copy
+                let textToCopy = '';
+                
+                // Check if it's a button with container ID (class css-47ekp)
+                const button = cell.querySelector('button.css-47ekp');
+                if (button) {
+                    textToCopy = button.textContent.trim();
+                } else {
+                    // Get text from span or direct cell content
+                    const span = cell.querySelector('span');
+                    textToCopy = span ? span.textContent.trim() : cell.textContent.trim();
+                }
+                
+                // Copy to clipboard
+                if (textToCopy) {
+                    navigator.clipboard.writeText(textToCopy).then(function() {
+                        // Show visual feedback
+                        Core.showCopyFeedback(cell, textToCopy);
+                        console.log(`📋 Copied to clipboard: ${textToCopy}`);
+                    }).catch(function(err) {
+                        // Fallback for older browsers
+                        Core.fallbackCopyToClipboard(textToCopy);
+                        Core.showCopyFeedback(cell, textToCopy);
+                        console.log(`📋 Copied to clipboard (fallback): ${textToCopy}`);
+                    });
+                }
+                
+                // Return false to ensure no further processing
+                return false;
+            }, true); // Use capture phase to intercept before button handlers
+        },
+        
+        // Fallback copy function for older browsers
+        fallbackCopyToClipboard: function(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                console.warn('Fallback copy failed:', err);
+            }
+            
+            document.body.removeChild(textArea);
+        },
+        
+        // Show visual feedback when text is copied
+        showCopyFeedback: function(cell, copiedText) {
+            // Create temporary tooltip
+            const tooltip = document.createElement('div');
+            tooltip.textContent = `Copied: ${copiedText}`;
+            tooltip.style.cssText = `
+                position: absolute;
+                background: #28a745;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+                font-size: 12px;
+                z-index: 10000;
+                pointer-events: none;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            `;
+            
+            // Position tooltip near the clicked cell
+            const rect = cell.getBoundingClientRect();
+            tooltip.style.left = (rect.left + window.scrollX) + 'px';
+            tooltip.style.top = (rect.top + window.scrollY - 30) + 'px';
+            
+            document.body.appendChild(tooltip);
+            
+            // Add green border to cell temporarily
+            const originalBorder = cell.style.border;
+            const originalBackground = cell.style.backgroundColor;
+            cell.style.border = '2px solid #28a745';
+            cell.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+            
+            // Remove feedback after 1.5 seconds
+            setTimeout(() => {
+                if (tooltip && tooltip.parentNode) {
+                    tooltip.parentNode.removeChild(tooltip);
+                }
+                cell.style.border = originalBorder;
+                cell.style.backgroundColor = originalBackground;
+            }, 1500);
+        },
+        
         // Enhanced container search with silent mode option (used by Dashboard and PalletLand)
         performContainerSearch: async function(containerId, silent = false) {
             const sessionData = SessionManager.get();
@@ -3550,6 +3662,8 @@
             // First, shorten existing column names to save space
             this.shortenColumnNames(table);
             
+            // Copy functionality is now handled globally - no need for table-specific setup
+            
             // First header row (main title) - update colspan
             if (headerRows[0]) {
                 const mainHeader = headerRows[0].querySelector('th');
@@ -3644,6 +3758,221 @@
                 }
             }
             return '';
+        },
+        
+        // Add Ctrl+Click copy functionality to container ID cells
+        addContainerIdCopyFunctionality: function(table) {
+            const containerIdCells = this.findContainerIdCells(table);
+            
+            containerIdCells.forEach(cell => {
+                // Skip if already enhanced
+                if (cell.dataset.rivCopyEnabled) return;
+                
+                // Mark as enhanced
+                cell.dataset.rivCopyEnabled = 'true';
+                
+                // Get the container ID text
+                const containerIdText = cell.textContent.trim();
+                
+                // Add visual indication that Ctrl+Click is available
+                cell.style.position = 'relative';
+                cell.title = `Container ID: ${containerIdText}\nCtrl+Click to copy instead of search`;
+                
+                // Add subtle visual indicator
+                const copyIndicator = document.createElement('span');
+                copyIndicator.innerHTML = '📋';
+                copyIndicator.style.cssText = `
+                    position: absolute;
+                    top: 2px;
+                    right: 2px;
+                    font-size: 10px;
+                    opacity: 0.3;
+                    pointer-events: none;
+                    transition: opacity 0.2s ease;
+                `;
+                cell.appendChild(copyIndicator);
+                
+                // Show indicator on hover
+                cell.addEventListener('mouseenter', () => {
+                    if (copyIndicator) copyIndicator.style.opacity = '0.7';
+                });
+                
+                cell.addEventListener('mouseleave', () => {
+                    if (copyIndicator) copyIndicator.style.opacity = '0.3';
+                });
+                
+                // Add click event handler using capture phase to intercept before child elements
+                cell.addEventListener('click', (event) => {
+                    if (event.ctrlKey || event.metaKey) {
+                        // Ctrl+Click: Copy to clipboard
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation(); // Stop other handlers on the same element
+                        
+                        this.copyToClipboard(containerIdText);
+                        
+                        // Visual feedback
+                        this.showCopyFeedback(cell, containerIdText);
+                        
+                        console.log(`📋 Copied container ID: ${containerIdText}`);
+                        
+                        return false; // Extra precaution to prevent default behavior
+                    }
+                    // Regular click: Let the original functionality proceed (search)
+                }, true); // Use capture phase to intercept before any child element handlers
+            });
+        },
+        
+        // Find container ID cells in the table
+        findContainerIdCells: function(table) {
+            const containerIdCells = [];
+            
+            // Look through all table cells for container ID patterns
+            const allCells = table.querySelectorAll('td');
+            
+            allCells.forEach(cell => {
+                const text = cell.textContent.trim();
+                
+                // Container ID patterns: Usually alphanumeric with dashes, 4+ characters
+                // Common patterns: DZ-CDPL-A01, P001234567, TOTE123456, etc.
+                if (this.looksLikeContainerId(text) && this.isCellClickable(cell)) {
+                    containerIdCells.push(cell);
+                }
+            });
+            
+            return containerIdCells;
+        },
+        
+        // Check if text looks like a container ID
+        looksLikeContainerId: function(text) {
+            // Skip empty or very short text
+            if (!text || text.length < 4) return false;
+            
+            // Skip common non-container text
+            const excludePatterns = [
+                /^\d{1,3}$/, // Simple numbers (quantities, etc.)
+                /^(yes|no|true|false)$/i,
+                /^(processing|urgent|tech|sideline)$/i,
+                /^\d{1,2}\/\d{1,2}\/\d{2,4}/, // Dates
+                /^\d{1,2}:\d{2}/, // Times
+                /^[a-z\s]+$/i // Pure text without numbers or special chars
+            ];
+            
+            for (const pattern of excludePatterns) {
+                if (pattern.test(text)) return false;
+            }
+            
+            // Container ID patterns
+            const containerPatterns = [
+                /^[A-Z0-9]{3,}-[A-Z0-9]{3,}-[A-Z0-9]{2,}$/i, // DZ-CDPL-A01 format
+                /^[P]\d{6,}$/i, // Pallet IDs like P001234567
+                /^[T][A-Z0-9]{5,}$/i, // Tote IDs like TOTE123456
+                /^[A-Z]{2,4}\d{6,}$/i, // General container format
+                /^[A-Z0-9]{8,}$/i, // Long alphanumeric IDs
+                /^[A-Z0-9-]{6,}$/i // General pattern with dashes
+            ];
+            
+            return containerPatterns.some(pattern => pattern.test(text));
+        },
+        
+        // Check if cell appears to be clickable (has cursor pointer or click handlers)
+        isCellClickable: function(cell) {
+            const style = window.getComputedStyle(cell);
+            const hasPointerCursor = style.cursor === 'pointer';
+            const hasClickHandler = cell.onclick !== null;
+            const hasEventListeners = cell.hasAttribute('onclick');
+            const isInClickableRow = cell.closest('tr[onclick]') !== null;
+            
+            return hasPointerCursor || hasClickHandler || hasEventListeners || isInClickableRow;
+        },
+        
+        // Copy text to clipboard
+        copyToClipboard: function(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                // Use modern Clipboard API
+                navigator.clipboard.writeText(text).catch(err => {
+                    console.warn('Failed to copy using Clipboard API:', err);
+                    this.fallbackCopyToClipboard(text);
+                });
+            } else {
+                // Fallback for older browsers
+                this.fallbackCopyToClipboard(text);
+            }
+        },
+        
+        // Fallback copy method for older browsers
+        fallbackCopyToClipboard: function(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.cssText = 'position: fixed; top: -1000px; opacity: 0;';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                console.log('✅ Fallback copy successful');
+            } catch (err) {
+                console.warn('❌ Fallback copy failed:', err);
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        },
+        
+        // Show visual feedback when copying
+        showCopyFeedback: function(cell, copiedText) {
+            // Create feedback element
+            const feedback = document.createElement('div');
+            feedback.textContent = `Copied: ${copiedText}`;
+            feedback.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                z-index: 999999;
+                opacity: 0;
+                transform: translateY(-10px);
+                transition: all 0.3s ease;
+            `;
+            
+            document.body.appendChild(feedback);
+            
+            // Animate in
+            setTimeout(() => {
+                feedback.style.opacity = '1';
+                feedback.style.transform = 'translateY(0)';
+            }, 10);
+            
+            // Remove after delay
+            setTimeout(() => {
+                feedback.style.opacity = '0';
+                feedback.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (feedback.parentNode) {
+                        feedback.parentNode.removeChild(feedback);
+                    }
+                }, 300);
+            }, 2000);
+            
+            // Brief highlight of the copied cell
+            const originalBg = cell.style.backgroundColor;
+            const originalTransition = cell.style.transition;
+            
+            cell.style.transition = 'background-color 0.3s ease';
+            cell.style.backgroundColor = '#d4edda';
+            
+            setTimeout(() => {
+                cell.style.backgroundColor = originalBg;
+                setTimeout(() => {
+                    cell.style.transition = originalTransition;
+                }, 300);
+            }, 500);
         },
         
         // Shorten column names to save space
@@ -4707,6 +5036,10 @@
     console.log('🎨 UI Enhancements initialized');
     console.log('🗂️ Category mappings are now user-configurable in Settings -> Advanced tab');
     
+    // Initialize copy functionality
+    Core.initializeCopyToClipboard();
+    console.log('📋 Copy to clipboard functionality initialized');
+    
     // Expose core modules for debugging (optional)
     if (typeof window !== 'undefined') {
         window.RIV_Core = Core;
@@ -4791,6 +5124,8 @@
             console.log('✅ Session data set to working values:', knownGood);
             console.log('💡 You can now try Dashboard or PalletLand scans');
         };
+        
+
     }
     
 })();
